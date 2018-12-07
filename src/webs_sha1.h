@@ -4,21 +4,31 @@
 #include <stdint.h>
 
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-	#define BIG_ENDIAN_QWORD(X) (\
-		((X >> 56) & 0x00000000000000FF) |\
-		((X >> 40) & 0x000000000000FF00) |\
-		((X >> 24) & 0x0000000000FF0000) |\
-		((X >> 8 ) & 0x00000000FF000000) |\
-		((X << 8 ) & 0x000000FF00000000) |\
-		((X << 24) & 0x0000FF0000000000) |\
-		((X << 40) & 0x00FF000000000000) |\
-		((X << 56) & 0xFF00000000000000) )
+	/* couldn't find anyway to declare 64-bit integer constants
+	 * in C89 (this may be just to avoid a compile warning) */
+	const uint32_t LL0[2] = {0xFF000000UL, 0x00000000UL};
+	const uint32_t LL1[2] = {0x00FF0000UL, 0x00000000UL};
+	const uint32_t LL2[2] = {0x0000FF00UL, 0x00000000UL};
+	const uint32_t LL3[2] = {0x000000FFUL, 0x00000000UL};
+	const uint32_t LL4[2] = {0x00000000UL, 0xFF000000UL};
+	const uint32_t LL5[2] = {0x00000000UL, 0x00FF0000UL};
+	const uint32_t LL6[2] = {0x00000000UL, 0x0000FF00UL};
+	const uint32_t LL7[2] = {0x00000000UL, 0x000000FFUL};
+	#define BIG_ENDIAN_QWORD(X) (uint64_t) (\
+		(((uint64_t) X >> 56) & *((uint64_t*) &LL0)) |\
+		(((uint64_t) X >> 40) & *((uint64_t*) &LL1)) |\
+		(((uint64_t) X >> 24) & *((uint64_t*) &LL2)) |\
+		(((uint64_t) X >> 8 ) & *((uint64_t*) &LL3)) |\
+		(((uint64_t) X << 8 ) & *((uint64_t*) &LL4)) |\
+		(((uint64_t) X << 24) & *((uint64_t*) &LL5)) |\
+		(((uint64_t) X << 40) & *((uint64_t*) &LL6)) |\
+		(((uint64_t) X << 56) & *((uint64_t*) &LL7)) )
 	
-	#define BIG_ENDIAN_DWORD(X) (\
-		((X >> 24) & 0x000000FF) |\
-		((X >> 8 ) & 0x0000FF00) |\
-		((X << 8 ) & 0x00FF0000) |\
-		((X << 24) & 0xFF000000) )
+	#define BIG_ENDIAN_DWORD(X) (uint32_t) (\
+		(((uint32_t) X >> 24) & 0x000000FFUL) |\
+		(((uint32_t) X >> 8 ) & 0x0000FF00UL) |\
+		(((uint32_t) X << 8 ) & 0x00FF0000UL) |\
+		(((uint32_t) X << 24) & 0xFF000000UL) )
 #else
 	#define BIG_ENDIAN_QWORD(X) X
 	#define BIG_ENDIAN_DWORD(X) X

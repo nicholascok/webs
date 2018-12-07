@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <pthread.h>
 #include <arpa/inet.h>
+#include <netinet/in.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -17,10 +18,11 @@ typedef uint16_t WORD;
 typedef uint32_t DWORD;
 typedef uint64_t QWORD;
 
-#ifndef _SIZE_T
+#if !defined(_SIZE_T) && !defined(_SIZE_T_DEFINED) && !defined(_SIZE_T_DECLARED)
 	#define _SIZE_T
+	#define _SIZE_T_DEFINED
+	#define _SIZE_T_DECLARED
 	typedef unsigned long size_t;
-	typedef signed long ssize_t;
 #endif
 
 #define PACKET_MAX 32768 + 10

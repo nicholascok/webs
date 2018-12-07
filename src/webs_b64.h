@@ -1,10 +1,11 @@
 #ifndef __WEBS_BASE_64_H__
 #define __WEBS_BASE_64_H__
 
-#ifndef _SIZE_T
+#if !defined(_SIZE_T) && !defined(_SIZE_T_DEFINED) && !defined(_SIZE_T_DECLARED)
 	#define _SIZE_T
+	#define _SIZE_T_DECLARED
+	#define _SIZE_T_DEFINED
 	typedef unsigned long size_t;
-	typedef signed long ssize_t;
 #endif
 
 #define TO_B64(X) ("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"[X])
