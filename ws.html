@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+	<head>
+	<title></title>
+	</head>
+	<body>
+		<script>
+			const socket = new WebSocket("ws://localhost:7752", []);
+			
+			socket.addEventListener("message", function(ev) {
+				console.log(ev.data);
+			});
+			
+			socket.addEventListener("open", function(ev) {
+				socket.send("o");
+				socket.send("oaigjioasjgaskop!");
+			});
+		</script>
+	</body>
+</html>
