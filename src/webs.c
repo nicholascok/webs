@@ -223,6 +223,8 @@ int bind_address(int _soc, int16_t _port) {
 	return -(error < 0);
 }
 
+#include <errno.h>
+
 /* accepts a connection from a client, and gives the
  * client its data, returns the client fd on success,
  * and a negatvie error code otherwise */
@@ -233,7 +235,6 @@ int accept_connection(int _soc, webs_client* _c) {
 	socklen_t addr_size = sizeof(_c->addr);
 	
 	_c->fd = accept(_soc, (struct sockaddr*) &_c->addr, &addr_size);
-	_c->_is_finished = 0;
 	
 	if (_c->fd < 0) return -1;
 	
@@ -245,9 +246,30 @@ int accept_connection(int _soc, webs_client* _c) {
 }
 
 /* user function to close socket */
-int webs_close(webs_client* _self) {
-	webs_remove_client((struct webs_client_node*) _self);
+int webs_eject(webs_client* _self) {
+	// call client on_close function
+	(*WEBS_EVENTS.on_close)(_self);
+	
 	close(_self->fd);
+	pthread_cancel(_self->thread);
+	webs_remove_client((struct webs_client_node*) _self);
+	
+	return 0;
+}
+
+/* shuter down */
+int webs_close(void) {
+	struct webs_client_node* node = __webs_global.head;
+	struct webs_client_node* temp;
+	
+	pthread_cancel(__webs_global.thread);
+	close(__webs_global.soc);
+	
+	while (node) {
+		temp = node->next;
+		webs_eject(&node->client);
+		node = temp;
+	}
 	
 	return 0;
 }
@@ -265,7 +287,8 @@ int __webs_client_main(webs_client* _self) {
 	
 	if (_self->buf_recv.len < 0) {
 		(*WEBS_EVENTS.on_error)(_self, WEBS_ERR_NO_HANDSHAKE);
-		webs_close(_self);
+		close(_self->fd);
+		webs_remove_client((struct webs_client_node*) _self);
 		return 0;
 	}
 	
@@ -276,7 +299,8 @@ int __webs_client_main(webs_client* _self) {
 	
 	if (webs_process_handshake(_self->buf_recv.data, &ws_info) < 0) {
 		(*WEBS_EVENTS.on_error)(_self, WEBS_ERR_BAD_REQUEST);
-		webs_close(_self);
+		close(_self->fd);
+		webs_remove_client((struct webs_client_node*) _self);
 		return 0;
 	}
 	
@@ -350,26 +374,31 @@ int __webs_client_main(webs_client* _self) {
 	// call client on_close function
 	(*WEBS_EVENTS.on_close)(_self);
 	
-	webs_close(_self);
+	close(_self->fd);
+	webs_remove_client((struct webs_client_node*) _self);
 	
 	return 0;
 }
 
+/* blocks until webs closes */
+int webs_hold(void) {
+	return pthread_join(__webs_global.thread, 0);
+}
+
 /* main loop, listens for connectinos and forks
  * them off for further initialisation */
-int __webs_main(int* _soc) {
-	pthread_t client_thread;
+int __webs_main() {
 	webs_client* user_ptr;
 	webs_client user;
 	
 	for (;;) {
-		user.fd = accept_connection(*_soc, &user);
+		user.fd = accept_connection(__webs_global.soc, &user);
 		
 		if (user.fd >= 0) {
 			if (webs_add_client(user, &user_ptr) < 0)
 				continue;
 			
-			pthread_create(&client_thread, 0, (void*) __webs_client_main, user_ptr);
+			pthread_create(&user_ptr->thread, 0, (void*) __webs_client_main, user_ptr);
 		}
 	}
 	
@@ -395,8 +424,11 @@ int webs_start(int _port) {
 	error = listen(soc, WEBS_SOCK_BACKLOG_MAX);
 	if (error < 0) return error;
 	
+	// pog
+	__webs_global.soc = soc;
+	
 	// fork further processing to seperate thread
-	pthread_create(&__webs_global.thread, 0, (void*) __webs_main, &soc);
+	pthread_create(&__webs_global.thread, 0, (void*) __webs_main, 0);
 	
 	return 0;
 }

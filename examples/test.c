@@ -16,6 +16,9 @@ int myFunc1(webs_client* self, char* data, size_t len) {
 			default: printf("%X ", data[i]);
 		}
 	printf(" ]\n");
+	
+	if (data[0] == 'E') webs_eject(self);
+	if (data[0] == 'C') webs_close();
 	return 0;
 }
 
@@ -32,7 +35,7 @@ int main(void) {
 	WEBS_EVENTS.on_data = myFunc1;
 	WEBS_EVENTS.on_close = myFunc2;
 	
-	for(;;);
+	webs_hold();
 	
 	return 0;
 }

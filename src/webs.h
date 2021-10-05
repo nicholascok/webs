@@ -88,6 +88,7 @@ struct {
 	struct webs_client_node* tail;
 	size_t num_clients;
 	pthread_t thread;
+	int soc;
 } __webs_global = {0};
 
 /* client struct: one is made
@@ -95,10 +96,10 @@ struct {
  * this struct is to be passed to
  * event handlers as `self`. */
 struct webs_client {
-	char _is_finished;
 	struct sockaddr_in addr;
 	struct webs_buffer buf_send;
 	struct webs_buffer buf_recv;
+	pthread_t thread;
 	long id;
 	int fd;
 };
