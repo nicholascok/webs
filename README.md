@@ -36,7 +36,7 @@ description: `<self>` is a pointer to the clients data in the form of a `struct 
 syntax: `int <my_func_name>(webs_client* <self>, char* <data>, size_t <length>);`  
 description: `<self>` is as before, `<data>` is a pointer to the recieved data, and `<length>` is the length of this data.
 
-#### `on_data`
+#### `on_error`
 syntax: `int <my_func_name>(webs_client* <self>, int <code>);`  
 description: `<self>` is as before, and <code> is an error code.
 
