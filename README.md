@@ -17,7 +17,7 @@ Then, add your own functions to any of the events listed  below by typing `WEBS_
 | `on_error` | called when an error occurs |
   
 ### Formatting
-when implementing you own functions, each event's function must be structured a certain way (this isn't c++), as detailed below, but first I'll include the struct definition for webs_client, for clarity
+when implementing you own functions, each event's function must be structured a certain way (this isn't c++), as detailed below, but first I'll include the struct definition for `struct webs_client`, for clarity
 
 ```
 struct webs_client {
@@ -42,3 +42,6 @@ description: `<self>` is as before, and <code> is an error code.
 
 ### Sending Data
 To send data, use either `webs_send(<self>, <string>)`, where `<self>` is the first function parameter, the client data pointer, and `<string>` is a null-terminating string, or `webs_sendn(<self>, <data_ptr>, <length>)`, where `<self>` is as before, `<data>` is a pointer to the data to be sent, and `<length>` is how many bytes to send.
+
+### Shutting Down
+To disconect a single client use `webs_eject(<self>)`, where `<self>` is the `struct webs_client` pointer of the client. Similarly, to shutdown the entire server used `webs_close()`, and to block until the server closes use `webs_hold()` on the main thread.
