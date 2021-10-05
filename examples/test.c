@@ -1,4 +1,4 @@
-#include "webs.c"
+#include "../src/webs.c"
 
 int myFunc0(webs_client* self) {
 	printf("(%d) connected!\n", self->id);
