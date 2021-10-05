@@ -1,7 +1,7 @@
 #include "webs_b64.h"
 #include "webs.h"
 
-/* adds a clietn to the linked list of connected
+/* adds a client to the linked list of connected
  * clients */
 int webs_add_client(webs_client _cli, webs_client** _r) {
 	/* if first client, set head = tail = new allocation,
@@ -38,7 +38,7 @@ int webs_add_client(webs_client _cli, webs_client** _r) {
 	return 0;
 }
 
-/* removes a clietn from the linked list of
+/* removes a client from the linked list of
  * connected clients (note that the node pointer
  * starts with the client so passing self is
  * suffice) */
@@ -244,6 +244,14 @@ int accept_connection(int _soc, webs_client* _c) {
 	}
 }
 
+/* user function to close socket */
+int webs_close(webs_client* _self) {
+	webs_remove_client((struct webs_client_node*) _self);
+	close(_self->fd);
+	
+	return 0;
+}
+
 /* main client function, called on a thread for each
  * connected client */
 int __webs_client_main(webs_client* _self) {
@@ -257,8 +265,7 @@ int __webs_client_main(webs_client* _self) {
 	
 	if (_self->buf_recv.len < 0) {
 		(*WEBS_EVENTS.on_error)(_self, WEBS_ERR_NO_HANDSHAKE);
-		webs_remove_client((struct webs_client_node*) _self);
-		close(_self->fd);
+		webs_close(_self);
 		return 0;
 	}
 	
@@ -269,8 +276,7 @@ int __webs_client_main(webs_client* _self) {
 	
 	if (webs_process_handshake(_self->buf_recv.data, &ws_info) < 0) {
 		(*WEBS_EVENTS.on_error)(_self, WEBS_ERR_BAD_REQUEST);
-		webs_remove_client((struct webs_client_node*) _self);
-		close(_self->fd);
+		webs_close(_self);
 		return 0;
 	}
 	
@@ -344,8 +350,7 @@ int __webs_client_main(webs_client* _self) {
 	// call client on_close function
 	(*WEBS_EVENTS.on_close)(_self);
 	
-	webs_remove_client((struct webs_client_node*) _self);
-	close(_self->fd);
+	webs_close(_self);
 	
 	return 0;
 }
