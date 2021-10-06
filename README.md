@@ -24,9 +24,10 @@ struct webs_client {
 	struct sockaddr_in addr; // client address
 	struct webs_buffer buf_send; // buffer, user can ignore this
 	struct webs_buffer buf_recv; // ditto
+	pthread_t thread; // client thread id
 	long id; // client id
 	int fd; // file descriptor for client socket
-}
+};
 ```
 #### `on_open` / `on_close`
 syntax: `int <my_func_name>(webs_client* <self>);`  
