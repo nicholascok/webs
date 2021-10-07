@@ -39,7 +39,7 @@ description: `<self>` is as before, `<data>` is a pointer to the recieved data, 
 
 #### `on_error`
 syntax: `int <my_func_name>(webs_client* <self>, int <code>);`  
-description: `<self>` is as before, and <code> is an error code.
+description: `<self>` is as before, and `<code>` is an error code.
 
 ### Sending Data
 To send data, use either `webs_send(<self>, <string>)`, where `<self>` is the first function parameter, the client data pointer, and `<string>` is a null-terminating string, or `webs_sendn(<self>, <data_ptr>, <length>)`, where `<self>` is as before, `<data>` is a pointer to the data to be sent, and `<length>` is how many bytes to send.
