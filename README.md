@@ -35,7 +35,8 @@ description: `<self>` is a pointer to the clients data in the form of a `struct 
 
 #### `on_data`
 syntax: `int <my_func_name>(webs_client* <self>, char* <data>, size_t <length>);`  
-description: `<self>` is as before, `<data>` is a pointer to the recieved data, and `<length>` is the length of this data.
+description: `<self>` is as before, `<data>` is a pointer to the recieved data, and `<length>` is the length of this data.  
+NOTE: data is freed when the function returns, doing so yourself may result in a double free.
 
 #### `on_error`
 syntax: `int <my_func_name>(webs_client* <self>, int <code>);`  
