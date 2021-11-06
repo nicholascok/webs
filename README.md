@@ -17,7 +17,7 @@ Then, add your own functions to any of the events listed  below by typing `WEBS_
 | `on_error` | called when an error occurs |
   
 ### Formatting
-when implementing you own functions, each event's function must be structured a certain way (this isn't c++), as detailed below, but first I'll include the struct definition for `struct webs_client`, for clarity
+when implementing you own functions, each event's function must be structured a certain way, as detailed below, but firstly, I'll include the definition for `struct webs_client`, in case it is useful.
 
 ```
 struct webs_client {
@@ -31,7 +31,7 @@ struct webs_client {
 ```
 #### `on_open` / `on_close`
 syntax: `int <my_func_name>(webs_client* <self>);`  
-description: `<self>` is a pointer to the clients data in the form of a `struct webs_client` pointer.
+description: `<self>` is a pointer to client data (of type `struct webs_client`).
 
 #### `on_data`
 syntax: `int <my_func_name>(webs_client* <self>, char* <data>, size_t <length>);`  
@@ -44,7 +44,7 @@ syntax: `int <my_func_name>(webs_client* <self>, int <code>);`
 description: `<self>` is as before, and `<code>` is an error code.
 
 ### Sending Data
-To send data, use either `webs_send(<self>, <string>)`, where `<self>` is the first function parameter, the client data pointer, and `<string>` is a null-terminating string, or `webs_sendn(<self>, <data_ptr>, <length>)`, where `<self>` is as before, `<data>` is a pointer to the data to be sent, and `<length>` is how many bytes to send.
+To send data, use either (1) `webs_send(<self>, <string>)`, where `<self>` is as before (forwarded to the send function), and `<string>` is a null-terminating string of data to be sent, or (2) `webs_sendn(<self>, <data_ptr>, <length>)`, where `<self>` is as before, `<data>` is a pointer to data that is to be sent, and `<length>` is how many bytes of data there are.
 
 ### Shutting Down
 To disconect a single client use `webs_eject(<self>)`, where `<self>` is the `struct webs_client` pointer of the client. Similarly, to shutdown the entire server used `webs_close()`, and to block until the server closes use `webs_hold()` on the main thread.
