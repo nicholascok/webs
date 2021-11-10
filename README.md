@@ -1,5 +1,5 @@
 # crd_webs
-simple websocket server library for c
+sub-optimal websocket server library for c
 
 ## Usage
 **Note:** as of writing you need to compile with `-lssl`, `-lcrypto`, and `-lpthread`  
