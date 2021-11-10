@@ -12,6 +12,8 @@
 #include <stdlib.h>
 #include <openssl/sha.h>
 
+#include "error.h"
+
 /* typedefs */
 #define BYTE uint8_t
 #define WORD uint16_t

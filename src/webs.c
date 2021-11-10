@@ -196,7 +196,7 @@ int webs_send(webs_client* _self, char* _data) {
 	int len = 0;
 	
 	/* check for nullptr or empty string */
-	if (!data || !*_data) return 0;
+	if (!_data || !*_data) return 0;
 	
 	/* get length of data */
 	while (_data[++len]);
