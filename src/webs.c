@@ -5,24 +5,19 @@
  * clients */
 int webs_add_client(webs_client _cli, webs_client** _r) {
 	/* if first client, set head = tail = new allocation,
-	 * otherwise just add after tail. (just a normal linked list)*/
+	 * otherwise just add after tail. (just a normal linked list) */
 	if (!__webs_global.tail) {
-		__webs_global.tail =
-		__webs_global.head = malloc(sizeof(struct webs_client_node));
+		__webs_global.tail = __webs_global.head = malloc(sizeof(struct webs_client_node));
 		
-		if (!__webs_global.tail) {
-			__webs_global.tail = __webs_global.head = 0;
-			return -1;
-		}
+		if (!__webs_global.tail)
+			XERR("Failed to allocate memory!", ENOMEM);
 		
 		__webs_global.head->prev = 0;
 	} else {
 		__webs_global.tail->next = malloc(sizeof(struct webs_client_node));
 		
-		if (!__webs_global.tail->next) {
-			__webs_global.tail->next = 0;
-			return -1;
-		}
+		if (!__webs_global.tail->next)
+			XERR("Failed to allocate memory!", ENOMEM);
 		
 		__webs_global.tail->next->prev = __webs_global.tail;
 		__webs_global.tail = __webs_global.tail->next;
@@ -49,6 +44,8 @@ int webs_remove_client(struct webs_client_node* _node) {
 	if (_node->next)
 		_node->next->prev = _node->prev;
 	
+	__webs_global.num_clients--;
+	
 	free(_node);
 	return 0;
 }
@@ -56,29 +53,44 @@ int webs_remove_client(struct webs_client_node* _node) {
 /* parses a websocket frame and returns relevant
  * data in `_frm` */
 int webs_parse_frame(char* _s, struct webs_frame* _frm) {
+	/* read the 2-byte header field */
 	WORD h = CAST(_s, WORD);
-	*_frm = (struct webs_frame) {h, WEBSFR_GET_LENGTH(h), 0, 0};
+	*_frm = (struct webs_frame) {h, 0, 0, 0};
 	
+	/* offset to payload from start of frame */
 	int data_start = 2;
 	
+	/* read the length feild (may offset payload) */
+	
+	/* a value of 126 here says to interpret the next two bytes */
 	if (WEBSFR_GET_LENGTH(h) == 126)
 		_frm->length = (WORD) FIX_ENDIAN_WORD(CAST(_s + 2, WORD)),
 		data_start = 4;
 	
+	/* a value of 127 says to interpret the next eight bytes */
 	else
 	if (WEBSFR_GET_LENGTH(h) == 127)
-		return -1;
+		_frm->length = (QWORD) FIX_ENDIAN_QWORD(CAST(_s + 2, QWORD)),
+		data_start = 10;
 	
+	/* otherwise, the raw value is used */
+	else
+		_frm->length = WEBSFR_GET_LENGTH(h);
+	
+	/* if the data is masked, the payload is further offset
+	 * to fit a four byte key */
 	if (WEBSFR_GET_MASKED(h))
 		_frm->key = CAST(_s + data_start, DWORD),
 		data_start += 4;
 	
+	/* set pointer to payload based on calculated offset */
 	_frm->data = _s + data_start;
 	_frm->off = data_start;
 	
 	return 0;
 }
 
+/* generates a websocket fame from the provided data */
 int webs_generate_frame(char* _src, char* _dst, size_t _n) {
 	int data_start = 2;
 	WORD hdr = 0;
@@ -107,7 +119,7 @@ int webs_generate_frame(char* _src, char* _dst, size_t _n) {
 	return _n + data_start;
 }
 
-/* decodes XOR encrypted data from a websocket client */
+/* decodes XOR encrypted data from a websocket frame */
 int webs_decode_data(BYTE* _dta, DWORD _key, size_t _n) {
 	for (int i = 0; i < _n; i++)
 		_dta[i] ^= ((BYTE*) &_key)[i % 4];
@@ -167,7 +179,7 @@ int webs_process_handshake(char* _src, struct webs_info* _rtn) {
 /* generates an HTTP handshake response for a
  * client requesting websocket. */
 int webs_generate_handshake(char* _d, char* _key) {
-	char buf[61 + 19]; // 61 needed, extra for safety
+	char buf[61 + 3]; // 61 needed, extra for safety
 	char hash[20 + 12]; // likewise
 	int len = 0;
 	
@@ -181,22 +193,22 @@ int webs_generate_handshake(char* _d, char* _key) {
 
 /* user functions used to send data over a websocket */
 int webs_send(webs_client* _self, char* _data) {
-	if (!*_data) write(
+	int len = 0;
+	
+	/* check for nullptr or empty string */
+	if (!data || !*_data) return 0;
+	
+	/* get length of data */
+	while (_data[++len]);
+	
+	/* write data */
+	return write(
 		_self->fd,
 		_self->buf_send.data,
-		webs_generate_frame(_data, _self->buf_send.data, 0)
+		webs_generate_frame(_data, _self->buf_send.data, len)
 	);
 	
-	else {
-		int len = 0;
-		while (_data[++len]);
-		
-		return write(
-			_self->fd,
-			_self->buf_send.data,
-			webs_generate_frame(_data, _self->buf_send.data, len)
-		);
-	}
+	return 0;
 }
 
 int webs_sendn(webs_client* _self, char* _data, size_t _n) {
@@ -213,23 +225,21 @@ int webs_sendn(webs_client* _self, char* _data, size_t _n) {
 int bind_address(int _soc, int16_t _port) {
 	struct sockaddr_in soc_addr;
 	
-	// init struct
+	/* init struct */
 	soc_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 	soc_addr.sin_port = htons(_port);
 	soc_addr.sin_family = AF_INET;
 	
-	// bind socket
+	/* bind socket */
 	int error = bind(_soc, (struct sockaddr*) &soc_addr, sizeof(soc_addr));
 	return -(error < 0);
 }
-
-#include <errno.h>
 
 /* accepts a connection from a client, and gives the
  * client its data, returns the client fd on success,
  * and a negatvie error code otherwise */
 int accept_connection(int _soc, webs_client* _c) {
-	static int client_id_counter = 0;
+	static long client_id_counter = 0;
 	
 	struct sockaddr_in client_addr;
 	socklen_t addr_size = sizeof(_c->addr);
@@ -238,16 +248,16 @@ int accept_connection(int _soc, webs_client* _c) {
 	
 	if (_c->fd < 0) return -1;
 	
-	else {
-		_c->id = client_id_counter;
-		client_id_counter++;
-		return _c->fd;
-	}
+	_c->id = client_id_counter;
+	client_id_counter++;
+	return _c->fd;
+	
+	return 0;
 }
 
-/* user function to close socket */
+/* user function to close a client socket */
 int webs_eject(webs_client* _self) {
-	// call client on_close function
+	/* call client on_close function */
 	(*WEBS_EVENTS.on_close)(_self);
 	
 	close(_self->fd);
@@ -277,12 +287,12 @@ int webs_close(void) {
 /* main client function, called on a thread for each
  * connected client */
 int __webs_client_main(webs_client* _self) {
-	int cont = 0; // used for handleing continuation frames
+	int cont = 0; /* used for handleing continuation frames */
 	size_t off = 0;
 	
-	char* data; // used to store data passed to on_data function
+	char* data; /* used to store data passed to on_data function */
 	
-	// wait for HTTP websocket request header
+	/* wait for HTTP websocket request header */
 	_self->buf_recv.len = read(_self->fd, _self->buf_recv.data, PACKET_MAX - 1);
 	
 	if (_self->buf_recv.len < 0) {
@@ -292,9 +302,8 @@ int __webs_client_main(webs_client* _self) {
 		return 0;
 	}
 	
+	/* process handshake */
 	_self->buf_recv.data[_self->buf_recv.len] = '\0';
-	
-	//process handshake
 	struct webs_info ws_info = {0};
 	
 	if (webs_process_handshake(_self->buf_recv.data, &ws_info) < 0) {
@@ -304,36 +313,35 @@ int __webs_client_main(webs_client* _self) {
 		return 0;
 	}
 	
+	/* generate + tansmit response */
 	_self->buf_send.len = webs_generate_handshake(_self->buf_send.data, ws_info.webs_key);
 	send(_self->fd, _self->buf_send.data, _self->buf_send.len, 0);
 	
-	// call clinet on_open function
+	/* call client on_open function */
 	(*WEBS_EVENTS.on_open)(_self);
 	
-	// main loop
+	/* main loop */
 	for (;;) {
-		// recieve data
+		/* recieve data */
 		if ((_self->buf_recv.len = read(_self->fd, _self->buf_recv.data, PACKET_MAX - 1)) < 1) break;
 		
-		// parse data from frame
+		/* parse data from frame */
 		struct webs_frame frm;
 		webs_parse_frame(_self->buf_recv.data, &frm);
-		
-		// null string yo
 		frm.data[frm.length] = '\0';
 		
-		// respond to pings
+		/* respond to pings */
 		if (WEBSFR_GET_OPCODE(frm.info) == 0x9) {
 			webs_sendn(_self, (char*) &(WORD){0x008A}, 2);
 			continue;
 		}
 		
-		// only accept text/binary/continuation frames
+		/* only accept text/binary/continuation frames */
 		if (WEBSFR_GET_OPCODE(frm.info) != 0x0
 		 && WEBSFR_GET_OPCODE(frm.info) != 0x1
 		 && WEBSFR_GET_OPCODE(frm.info) != 0x2) continue;
 		
-		// handle continuation frames
+		/* handle continuation frames */
 		if (!WEBSFR_GET_FINISH(frm.info)) {
 			if (WEBSFR_GET_OPCODE(frm.info) != 0x0)
 				data = malloc(frm.length + 1),
@@ -350,7 +358,7 @@ int __webs_client_main(webs_client* _self) {
 			continue;
 		}
 		
-		// deal with non-fragmented frames
+		/* deal with non-fragmented frames */
 		if (!cont) {
 			data = malloc(frm.length + 1);
 			memcpy(data, frm.data, frm.length + 1);
@@ -358,20 +366,16 @@ int __webs_client_main(webs_client* _self) {
 			off = frm.length;
 		}
 		
-		else {
-			cont = 0;
-		}
+		else cont = 0;
 		
-		// call clinet on_data function
-		if (data)
-			(*WEBS_EVENTS.on_data)(_self, data, off);
-		
+		/* call clinet on_data function */
+		if (data) (*WEBS_EVENTS.on_data)(_self, data, off);
 		free(data);
 		
 		continue;
 	}
 	
-	// call client on_close function
+	/* call client on_close function */
 	(*WEBS_EVENTS.on_close)(_self);
 	
 	close(_self->fd);
@@ -395,9 +399,7 @@ int __webs_main() {
 		user.fd = accept_connection(__webs_global.soc, &user);
 		
 		if (user.fd >= 0) {
-			if (webs_add_client(user, &user_ptr) < 0)
-				continue;
-			
+			if (webs_add_client(user, &user_ptr) < 0) continue;
 			pthread_create(&user_ptr->thread, 0, (void*) __webs_client_main, user_ptr);
 		}
 	}
@@ -411,11 +413,11 @@ int __webs_main() {
 int webs_start(int _port) {
 	int error = 0;
 	
-	// basic socket setup
+	/* basic socket setup */
 	int soc = socket(AF_INET, SOCK_STREAM, 0);
 	if (soc < 0) return error;
 	
-	// allow reconnection to socket (for sanity)
+	/* allow reconnection to socket (for sanity) */
 	setsockopt(soc, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
 	
 	error = bind_address(soc, _port);
@@ -424,10 +426,9 @@ int webs_start(int _port) {
 	error = listen(soc, WEBS_SOCK_BACKLOG_MAX);
 	if (error < 0) return error;
 	
-	// pog
 	__webs_global.soc = soc;
 	
-	// fork further processing to seperate thread
+	/* fork further processing to seperate thread */
 	pthread_create(&__webs_global.thread, 0, (void*) __webs_main, 0);
 	
 	return 0;
