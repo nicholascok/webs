@@ -2,6 +2,7 @@
 #define __WEBS_H__
 
 #include <sys/socket.h>
+#include <errno.h>
 #include <stdio.h>
 #include <pthread.h>
 #include <arpa/inet.h>
