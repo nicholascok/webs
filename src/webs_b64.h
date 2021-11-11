@@ -14,19 +14,21 @@
  * in `_d`. The number of successfully written bytes is
  * returned. */
 int webs_b64_encode(char* _s, char* _d, size_t _n) {
-	/* belay data past a multiple of 3 bytes - so
-	 * we end on a whole number of encoded chars in
-	 * the main loop. */
-	int rem = _n % 3;
-	size_t i = 0;
+	size_t i = 0; /* iteration variable */
 	
 	/* `n_max` is the number of base-64 chars we
 	 * expect to output in the main loop */
 	size_t n_max;
 	
+	/* belay data past a multiple of 3 bytes - so
+	 * we end on a whole number of encoded chars in
+	 * the main loop. */
+	int rem = _n % 3;
 	_n -= rem;
+	
 	n_max = (_n * 4) / 3;
 	
+	/* process bulk of data */
 	while (i < n_max) {
 		_d[i + 0] = TO_B64(( _s[0] & 0xFC) >> 2);
 		_d[i + 1] = TO_B64(((_s[0] & 0x03) << 4) | ((_s[1] & 0xF0) >> 4));
@@ -60,8 +62,8 @@ int webs_b64_encode(char* _s, char* _d, size_t _n) {
  * pointed to by `_s`, writing the resulting binary data to
  * `_d`. The number of successfully written bytes is returned. */
 int webs_b64_decode(char* _s, char* _d) {
-	_s = _d;
-	_d = _s;
+	_s = _d; /* these are here to avoid compiler warnings while */
+	_d = _s; /* this function is under development. (it is never called) */
 	
 	return 0;
 }
