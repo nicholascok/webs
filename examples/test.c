@@ -1,29 +1,31 @@
 #include "../src/webs.c"
 
 int myFunc0(webs_client* self) {
-	printf("(%d) connected!\n", self->id);
+	printf("(%ld) connected!\n", self->id);
 	webs_send(self, "gotya8");
 	
 	return 0;
 }
 
 int myFunc1(webs_client* self, char* data, size_t len) {
-	printf("(%d) data [ %s ] (%i bytes)\n", self->id, data, len);
+	size_t i;
+	
+	printf("(%ld) data [ %s ] (%lu bytes)\n", self->id, data, len);
+	
 	printf("raw: [ ");
-	for (int i = 0; i < len; i++)
-		switch(data[i]) {
-			case ' ' ... '~': printf("%c ", data[i]); break;
-			default: printf("%X ", data[i]);
-		}
-	printf(" ]\n");
+	for (i = 0; i < len; i++)
+		if ( data[i] >= ' ' && data[i] <= '~') printf("%c ", data[i]);
+		else printf("%X ", data[i]);
+	printf("]\n");
 	
 	if (data[0] == 'E') webs_eject(self);
 	if (data[0] == 'C') webs_close();
+	
 	return 0;
 }
 
 int myFunc2(webs_client* self) {
-	printf("(%d) disconnected!\n", self->id);
+	printf("(%ld) disconnected!\n", self->id);
 	
 	return 0;
 }

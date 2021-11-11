@@ -2,23 +2,26 @@
 #define __WEBS_H__
 
 #include <sys/socket.h>
-#include <errno.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <pthread.h>
 #include <arpa/inet.h>
-#include <poll.h>
 #include <string.h>
 #include <unistd.h>
-#include <stdlib.h>
-#include <openssl/sha.h>
 
 #include "error.h"
 
 /* typedefs */
-#define BYTE uint8_t
-#define WORD uint16_t
-#define DWORD uint32_t
-#define QWORD uint64_t
+typedef uint8_t  BYTE;
+typedef uint16_t WORD;
+typedef uint32_t DWORD;
+typedef uint64_t QWORD;
+
+#ifndef _SIZE_T
+	#define _SIZE_T
+	typedef unsigned long size_t;
+	typedef signed long ssize_t;
+#endif
 
 #define PACKET_MAX 32768 + 10
 #define WEBS_SOCK_BACKLOG_MAX 8
@@ -38,6 +41,7 @@
 #define WEBSFR_SET_RESVRD(H, V) (H |= ((WORD) ((BYTE) V & 0x07) << 4 ))
 
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+	#define MAKE_WORD(C0, C1) ((((uint16_t) ((uint8_t) C1)) << 8) | ((uint16_t) ((uint8_t) C0)))
 	#define FIX_ENDIAN_WORD(X) (((X << 8) & 0xFF00) | ((X >> 8) & 0x00FF))
 	#define FIX_ENDIAN_QWORD(X) (\
 		((X >> 56) & 0x00000000000000FF) |\
@@ -49,6 +53,7 @@
 		((X >> 8 ) & 0x00FF000000000000) |\
 		((X >> 0 ) & 0xFF00000000000000) )
 #else
+	#define MAKE_WORD(C0, C1) ((((uint16_t) ((uint8_t) C0)) << 8) | ((uint16_t) ((uint8_t) C1)))
 	#define FIX_ENDIAN_WORD(X)
 	#define FIX_ENDIAN_QWORD(X)
 #endif
@@ -58,7 +63,7 @@
 enum {
 	WEBS_ERR_NONE = 0,
 	WEBS_ERR_NO_HANDSHAKE,
-	WEBS_ERR_BAD_REQUEST,
+	WEBS_ERR_BAD_REQUEST
 };
 
 /* stores data from a websocket
@@ -66,17 +71,17 @@ enum {
 struct webs_frame {
 	WORD info;
 	size_t length;
-	int off;
-	BYTE* data;
+	WORD off;
+	char* data;
 	DWORD key;
 } __attribute__ ((__packed__));
 
 /* stores data parsed from a
  * HTTP websocket request */
 struct webs_info {
-	char webs_key[24 + 1]; // base-64 encoded string (web-socket key)
-	WORD webs_vrs;         // web-socket version [integer]
-	WORD http_vrs;         // http version [concatonated chars]
+	char webs_key[24 + 1]; /* base-64 encoded string (web-socket key) */
+	WORD webs_vrs;         /* web-socket version [integer] */
+	WORD http_vrs;         /* http version [concatonated chars] */
 };
 
 struct webs_buffer {
@@ -118,7 +123,7 @@ struct webs_client_node {
 	struct webs_client_node* prev;
 };
 
-// funcs
+/* functions */
 int str_cat(char* _buf, char* _a, char* _b) {
 	int len = 0;
 	while (*_a) *(_buf++) = *(_a++), len++;
@@ -128,21 +133,23 @@ int str_cat(char* _buf, char* _a, char* _b) {
 }
 
 int str_cmp(char* _a, char* _b) {
-	for (int i = 0; _a[i] == _b[i]; i++)
+	int i;
+	for (i = 0; _a[i] == _b[i]; i++)
 		if (!_a[i] && !_b[i]) return 1;
 	return 0;
 }
 
 int str_cmp_insensitive(char* _a, char* _b) {
-	for (int i = 0; _a[i] == _b[i] || _a[i] == _b[i] - 0x20 || _a[i] == _b[i] + 0x20; i++)
+	int i;
+	for (i = 0; _a[i] == _b[i] || _a[i] == _b[i] - 0x20 || _a[i] == _b[i] + 0x20; i++)
 		if (!_a[i] && !_b[i]) return 1;
 	return 0;
 }
 
-// declarations
-int webs_void_handler0(webs_client*               ) {return 0;}
-int webs_void_handler1(webs_client*, char*, size_t) {return 0;}
-int webs_void_handler2(webs_client*, int          ) {return 0;}
+/* declarations */
+int webs_void_handler0(webs_client* c                   ) {return c->id;                   }
+int webs_void_handler1(webs_client* c, char* d, size_t l) {return c->id + (intptr_t) d + l;}
+int webs_void_handler2(webs_client* c, int e            ) {return c->id + e;               }
 
 struct {
 	int (*on_error)(webs_client*, int);

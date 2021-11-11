@@ -12,7 +12,10 @@
 			});
 			
 			socket.addEventListener("open", function(ev) {
-				socket.send("o");
+				socket.send("hello");
+				socket.send("there");
+				socket.send("how");
+				socket.send("you");
 				socket.send("oaigjioasjgaskop!");
 			});
 		</script>
