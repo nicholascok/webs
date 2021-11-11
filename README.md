@@ -2,7 +2,7 @@
 sub-optimal websocket server library for c
 
 ## Usage
-**Note:** as of writing you need to compile with `-lssl`, `-lcrypto`, and `-lpthread`  
+**Note:** requires compilation with `-lpthread`  
   
 To start include the mian file `webs.c` in you program, then to start listening on a port use `webs_start(<port>)`, of course with `<port>` being replaced with the port you wish to listen on.  
   
@@ -48,3 +48,16 @@ To send data, use either (1) `webs_send(<self>, <string>)`, where `<self>` is as
 
 ### Shutting Down
 To disconect a single client use `webs_eject(<self>)`, where `<self>` is the `struct webs_client` pointer of the client. Similarly, to shutdown the entire server used `webs_close()`, and to block until the server closes use `webs_hold()` on the main thread.
+
+### Global Information
+Finally, here is the definition for `__webs_global`, which has some potentially pertinant information:
+
+```
+struct {
+	struct webs_client_node* head; // head of linked list of connected clients
+	struct webs_client_node* tail; // likewise, though tail
+	size_t num_clients; // number of connected clients
+	pthread_t thread; // thread listening for connections
+	int soc; // server socket id
+} __webs_global;
+```
