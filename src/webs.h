@@ -10,6 +10,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "webs_endian.h"
 #include "error.h"
 
 /* typedefs */
@@ -30,35 +31,24 @@ typedef uint64_t QWORD;
 
 #define CAST(X, T) (*((T*) (X)))
 
-#define WEBSFR_GET_LENGTH(H) ((H & 0x7F00) >> 8 )
-#define WEBSFR_GET_OPCODE(H) ((H & 0x000F) >> 0 )
-#define WEBSFR_GET_MASKED(H) ((H & 0x8000) >> 15)
-#define WEBSFR_GET_FINISH(H) ((H & 0x0080) >> 7 )
-#define WEBSFR_GET_RESVRD(H) ((H & 0x0070) >> 4 )
+/* declare masks in an endian-independant way */
+const uint8_t WEBSFR_LENGTH_MASK[2] = {0x00, 0x7F};
+const uint8_t WEBSFR_OPCODE_MASK[2] = {0x0F, 0x00};
+const uint8_t WEBSFR_MASKED_MASK[2] = {0x00, 0x80};
+const uint8_t WEBSFR_FINISH_MASK[2] = {0x80, 0x00};
+const uint8_t WEBSFR_RESVRD_MASK[2] = {0x70, 0x00};
+
+#define WEBSFR_GET_LENGTH(H) ((H & *((uint16_t*) &WEBSFR_LENGTH_MASK)) >> 8 )
+#define WEBSFR_GET_OPCODE(H) ((H & *((uint16_t*) &WEBSFR_OPCODE_MASK)) >> 0 )
+#define WEBSFR_GET_MASKED(H) ((H & *((uint16_t*) &WEBSFR_MASKED_MASK)) >> 15)
+#define WEBSFR_GET_FINISH(H) ((H & *((uint16_t*) &WEBSFR_FINISH_MASK)) >> 7 )
+#define WEBSFR_GET_RESVRD(H) ((H & *((uint16_t*) &WEBSFR_RESVRD_MASK)) >> 4 )
 
 #define WEBSFR_SET_LENGTH(H, V) (H |= ((WORD) ((BYTE) V & 0x7F) << 8 ))
 #define WEBSFR_SET_OPCODE(H, V) (H |= ((WORD) ((BYTE) V & 0x0F) << 0 ))
 #define WEBSFR_SET_MASKED(H, V) (H |= ((WORD) ((BYTE) V & 0x01) << 15))
 #define WEBSFR_SET_FINISH(H, V) (H |= ((WORD) ((BYTE) V & 0x01) << 7 ))
 #define WEBSFR_SET_RESVRD(H, V) (H |= ((WORD) ((BYTE) V & 0x07) << 4 ))
-
-#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-	#define MAKE_WORD(C0, C1) ((((uint16_t) ((uint8_t) C1)) << 8) | ((uint16_t) ((uint8_t) C0)))
-	#define FIX_ENDIAN_WORD(X) (((X << 8) & 0xFF00) | ((X >> 8) & 0x00FF))
-	#define FIX_ENDIAN_QWORD(X) (\
-		((X >> 56) & 0x00000000000000FF) |\
-		((X >> 48) & 0x000000000000FF00) |\
-		((X >> 40) & 0x0000000000FF0000) |\
-		((X >> 32) & 0x00000000FF000000) |\
-		((X >> 24) & 0x000000FF00000000) |\
-		((X >> 16) & 0x0000FF0000000000) |\
-		((X >> 8 ) & 0x00FF000000000000) |\
-		((X >> 0 ) & 0xFF00000000000000) )
-#else
-	#define MAKE_WORD(C0, C1) ((((uint16_t) ((uint8_t) C0)) << 8) | ((uint16_t) ((uint8_t) C1)))
-	#define FIX_ENDIAN_WORD(X)
-	#define FIX_ENDIAN_QWORD(X)
-#endif
 
 #define WEBS_RESPONSE_FMT "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: %s\r\n\r\n"
 

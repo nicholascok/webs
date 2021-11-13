@@ -66,13 +66,13 @@ int webs_parse_frame(char* _s, struct webs_frame* _frm) {
 	
 	/* a value of 126 here says to interpret the next two bytes */
 	if (WEBSFR_GET_LENGTH(h) == 126)
-		_frm->length = (WORD) FIX_ENDIAN_WORD(CAST(_s + 2, WORD)),
+		_frm->length = (WORD) BIG_ENDIAN_WORD(CAST(_s + 2, WORD)),
 		data_start = 4;
 	
 	/* a value of 127 says to interpret the next eight bytes */
 	else
 	if (WEBSFR_GET_LENGTH(h) == 127)
-		_frm->length = (QWORD) FIX_ENDIAN_QWORD(CAST(_s + 2, QWORD)),
+		_frm->length = (QWORD) BIG_ENDIAN_QWORD(CAST(_s + 2, QWORD)),
 		data_start = 10;
 	
 	/* otherwise, the raw value is used */
@@ -102,13 +102,13 @@ int webs_generate_frame(char* _src, char* _dst, size_t _n) {
 	
 	if (_n > 125)
 		WEBSFR_SET_LENGTH(hdr, 126),
-		CAST(_dst + 2, WORD) = FIX_ENDIAN_WORD((WORD) _n),
+		CAST(_dst + 2, WORD) = BIG_ENDIAN_WORD((WORD) _n),
 		data_start = 4;
 	
 	else
 	if (_n > 65536)
 		WEBSFR_SET_LENGTH(hdr, 127),
-		CAST(_dst + 2, QWORD) = FIX_ENDIAN_WORD((QWORD) _n),
+		CAST(_dst + 2, QWORD) = BIG_ENDIAN_WORD((QWORD) _n),
 		data_start = 10;
 	
 	else
@@ -284,7 +284,7 @@ int webs_close(void) {
 /* main client function, called on a thread for each
  * connected client */
 int __webs_client_main(webs_client* _self) {
-	const WORD PING = MAKE_WORD(0x00, 0x8A);
+	const WORD PING = 0x008A;
 	
 	int cont = 0; /* used for handleing continuation frames */
 	size_t fr_size = 0;

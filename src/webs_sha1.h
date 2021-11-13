@@ -2,37 +2,7 @@
 #define __WEBS_SHA1_H__
 
 #include <stdint.h>
-
-#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-	/* couldn't find anyway to declare 64-bit integer constants
-	 * in C89 (this may be just to avoid a compile warning) */
-	const uint32_t LL0[2] = {0xFF000000UL, 0x00000000UL};
-	const uint32_t LL1[2] = {0x00FF0000UL, 0x00000000UL};
-	const uint32_t LL2[2] = {0x0000FF00UL, 0x00000000UL};
-	const uint32_t LL3[2] = {0x000000FFUL, 0x00000000UL};
-	const uint32_t LL4[2] = {0x00000000UL, 0xFF000000UL};
-	const uint32_t LL5[2] = {0x00000000UL, 0x00FF0000UL};
-	const uint32_t LL6[2] = {0x00000000UL, 0x0000FF00UL};
-	const uint32_t LL7[2] = {0x00000000UL, 0x000000FFUL};
-	#define BIG_ENDIAN_QWORD(X) (uint64_t) (\
-		(((uint64_t) X >> 56) & *((uint64_t*) &LL0)) |\
-		(((uint64_t) X >> 40) & *((uint64_t*) &LL1)) |\
-		(((uint64_t) X >> 24) & *((uint64_t*) &LL2)) |\
-		(((uint64_t) X >> 8 ) & *((uint64_t*) &LL3)) |\
-		(((uint64_t) X << 8 ) & *((uint64_t*) &LL4)) |\
-		(((uint64_t) X << 24) & *((uint64_t*) &LL5)) |\
-		(((uint64_t) X << 40) & *((uint64_t*) &LL6)) |\
-		(((uint64_t) X << 56) & *((uint64_t*) &LL7)) )
-	
-	#define BIG_ENDIAN_DWORD(X) (uint32_t) (\
-		(((uint32_t) X >> 24) & 0x000000FFUL) |\
-		(((uint32_t) X >> 8 ) & 0x0000FF00UL) |\
-		(((uint32_t) X << 8 ) & 0x00FF0000UL) |\
-		(((uint32_t) X << 24) & 0xFF000000UL) )
-#else
-	#define BIG_ENDIAN_QWORD(X) X
-	#define BIG_ENDIAN_DWORD(X) X
-#endif
+#include "webs_endian.h"
 
 /* bitwise rotate left */
 #define ROL(X, N) ((X << N) | (X >> ((sizeof(X) * 8) - N)))
