@@ -26,7 +26,14 @@ typedef uint64_t QWORD;
 	typedef unsigned long size_t;
 #endif
 
-#define PACKET_MAX 32768 + 10
+#ifndef WEBS_MAX_PACKET
+	#define WEBS_MAX_PACKET 98304
+#endif
+
+#ifndef WEBS_MAX_SOCKET
+	#define WEBS_MAX_SOCKET 49152
+#endif
+
 #define WEBS_SOCK_BACKLOG_MAX 8
 
 #define CAST(X, T) (*((T*) (X)))
@@ -52,19 +59,32 @@ const uint8_t WEBSFR_RESVRD_MASK[2] = {0x70, 0x00};
 
 #define WEBS_RESPONSE_FMT "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: %s\r\n\r\n"
 
-enum {
+enum webs_err {
 	WEBS_ERR_NONE = 0,
-	WEBS_ERR_NO_HANDSHAKE,
-	WEBS_ERR_BAD_REQUEST
+	WEBS_NO_CONTEXT,
+	WEBS_ERR_BAD_REQUEST,
+	WEBS_ERR_BAD_FRAME,
+	WEBS_ERR_OVERFLOW,
+	WEBS_ERR_READ_FAILED
 };
+
+char* webs_err_msgs[] = {
+	"WEBS_ERR_NONE: OK",
+	"WEBS_NO_CONTEXT: recieved continuation from with no known start frame.",
+	"WEBS_ERR_BAD_REQUEST: HTTP request from user is improperly formatted.",
+	"WEBS_ERR_BAD_FRAME: failed to parse websocket frame.",
+	"WEBS_ERR_OVERFLOW: recieved too much data (greater than 100000 bytes).",
+	"WEBS_ERR_READ_FAILED: failed to read data from socket."
+};
+
+void webs_perror(enum webs_err _ec) { printf("%s\n", webs_err_msgs[_ec]); }
 
 /* stores data from a websocket
  * frame */
 struct webs_frame {
 	WORD info;
-	size_t length;
-	WORD off;
-	char* data;
+	uint64_t length;
+	short off;
 	DWORD key;
 } __attribute__ ((__packed__));
 
@@ -77,7 +97,7 @@ struct webs_info {
 };
 
 struct webs_buffer {
-	char data[PACKET_MAX];
+	char data[WEBS_MAX_SOCKET];
 	size_t len;
 };
 
@@ -141,10 +161,10 @@ int str_cmp_insensitive(char* _a, char* _b) {
 /* declarations */
 int webs_void_handler0(webs_client* c                   ) {return c->id;                   }
 int webs_void_handler1(webs_client* c, char* d, size_t l) {return c->id + (intptr_t) d + l;}
-int webs_void_handler2(webs_client* c, int e            ) {return c->id + e;               }
+int webs_void_handler2(webs_client* c, enum webs_err e  ) {return c->id + e;               }
 
 struct {
-	int (*on_error)(webs_client*, int);
+	int (*on_error)(webs_client*, enum webs_err);
 	int (*on_data)(webs_client*, char*, size_t);
 	int (*on_open)(webs_client*);
 	int (*on_close)(webs_client*);
