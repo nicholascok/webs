@@ -8,9 +8,9 @@
 #include <errno.h>
 
 #if __STDC_VERSION__ > 199409L
-	#define XERR(MESG, ERR) { printf("\x1b[31m\x1b[1mInternal Runtime Error: \x1b[0m(in "__PASTE(__FILE__)", func: \x1b[1m%s\x1b[0m [line \x1b[1m"__PASTE(__LINE__)"\x1b[0m]) : "MESG"\n", __func__); exit(ERR); }
+	#define XERR(MESG, ERR) { printf("\x1b[31m\x1b[1mRuntime Error: \x1b[0m(in "__PASTE(__FILE__)", func: \x1b[1m%s\x1b[0m [line \x1b[1m"__PASTE(__LINE__)"\x1b[0m]) : "MESG"\n", __func__); exit(ERR); }
 #else
-	#define XERR(MESG, ERR) { printf("\x1b[31m\x1b[1mInternal Runtime Error: \x1b[0m(in "__PASTE(__FILE__)", line \x1b[1m"__PASTE(__LINE__)"\x1b[0m) : "MESG"\n"); exit(ERR); }
+	#define XERR(MESG, ERR) { printf("\x1b[31m\x1b[1mRuntime Error: \x1b[0m(in "__PASTE(__FILE__)", line \x1b[1m"__PASTE(__LINE__)"\x1b[0m) : "MESG"\n"); exit(ERR); }
 #endif
 
 #endif

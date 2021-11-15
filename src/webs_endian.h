@@ -1,7 +1,19 @@
 #ifndef __WEBS_ENDIAN_H__
 #define __WEBS_ENDIAN_H__
 
-	#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+	#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+		
+		#define BIG_ENDIAN_WORD(X) X
+		
+		#define BIG_ENDIAN_DWORD(X) X
+		
+		#define BIG_ENDIAN_QWORD(X) X
+		
+	#else
+		
+		#if __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__
+			#warning Could not determine system endianness (assumng little endian).
+		#endif
 		
 		#define BIG_ENDIAN_WORD(X) (((X << 8) & 0xFF00) | ((X >> 8) & 0x00FF))
 		
@@ -21,14 +33,6 @@
 			((uint32_t*) &_x)[0] ^= ((uint32_t*) &_x)[1];
 			return _x;
 		}
-		
-	#else
-		
-		#define BIG_ENDIAN_WORD(X) X
-		
-		#define BIG_ENDIAN_DWORD(X) X
-		
-		#define BIG_ENDIAN_QWORD(X) X
 		
 	#endif
 
