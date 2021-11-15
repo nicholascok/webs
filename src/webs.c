@@ -1,5 +1,8 @@
 #include "webs.h"
 
+/* SSIZE_T MAX */
+const size_t WEBS_SSIZE_MAX = (((size_t)(-1)) / 2);
+
 /* header for pong frame (in response to ping) */
 const uint8_t PING[2] = {0x89, 0x00};
 const uint8_t PONG[2] = {0x8A, 0x00};
@@ -93,11 +96,11 @@ void webs_close(webs_server* _srv) {
 	return;
 }
 
-int webs_flush(int _fd, ssize_t _n) {
+size_t webs_flush(int _fd, size_t _n) {
 	static char vbuf[512]; /* void buffer */
 	short size = 512; /* number of bytes to dispose in next read */
-	ssize_t i = 0; /* iteration variable */
 	ssize_t result; /* stores result of read(2) */
+	size_t i = 0; /* iteration variable */
 	
 	/* process data in chunks of 512 bytes, or if the number of
 	 * reaining bytes to be read is less than that, update the
@@ -403,6 +406,10 @@ void __webs_client_main(webs_client* _self) {
 			(*_self->srv->events.on_error)(_self, WEBS_ERR_NO_SUPPORT);
 			webs_flush(_self->fd, frm.off + frm.length - 2);
 			continue;
+		}
+		if ((size_t) frm.length > WEBS_SSIZE_MAX) {
+			(*_self->srv->events.on_error)(_self, WEBS_ERR_OVERFLOW);
+			webs_flush(_self->fd, frm.off + frm.length - 2);
 		}
 		
 		/* respond to ping */

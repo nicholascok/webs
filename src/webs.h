@@ -9,17 +9,14 @@
 #include <pthread.h>
 #include <unistd.h>
 
-/* check for POSIX compliance (no support for windows yet) */
-#ifndef _POSIX_VERSION
-	#error CRD_WEBS requires a POSIX compliant system
-#endif
-
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
 #include "webs_endian.h"
 #include "error.h"
+
+const size_t WEBS_SSIZE_MAX;
 
 #define WEBS_MAX_PACKET 32768
 
@@ -104,7 +101,8 @@ enum webs_error {
 	WEBS_ERR_NONE = 0,
 	WEBS_ERR_READ_FAILED,
 	WEBS_ERR_UNEXPECTED_CONTINUTATION,
-	WEBS_ERR_NO_SUPPORT
+	WEBS_ERR_NO_SUPPORT,
+	WEBS_ERR_OVERFLOW
 };
 
 /* default handlers for client events */
@@ -164,7 +162,7 @@ void webs_close(webs_server* _srv);
  * (this is used to skip frames that cannot be processed)
  * @param _fd: the descritor whos buffer is to be emptied.
  * @return the number of bytes successfully processed. */
-int webs_flush(int _fd, ssize_t _n);
+size_t webs_flush(int _fd, size_t _n);
 
 /**
  * wraper functon that deals with reading lage amounts

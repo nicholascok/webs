@@ -22,7 +22,7 @@ int myFunc1(webs_client* self, char* data, ssize_t len) {
 	printf("server %ld: (id %ld) data [ %s ] (%lu bytes)\n", self->srv->id, self->id, data, len);
 	
 	else
-	printf("server %ld: (id %ld) data {TOO MUCH, I WONT RUIN YOUR NICE TERMINAL} (%lu bytes)\n", self->srv->id, self->id, len);
+	printf("server %ld: (id %ld) data {TOO MUCH, I WONT RUIN YOUR NICE TERMINAL BUT REST ASSURED WE HAVE DATA} (%lu bytes)\n", self->srv->id, self->id, len);
 	
 	if (data[0] == 'E') webs_eject(self);
 	if (data[0] == 'C') webs_close(self->srv);
@@ -47,6 +47,9 @@ int myFunc3(webs_client* self, enum webs_error err) {
 			break;
 		case WEBS_ERR_NO_SUPPORT:
 			printf("server %ld - on_error: frame opcode unsupported.\n", self->srv->id);
+			break;
+		case WEBS_ERR_OVERFLOW:
+			printf("server %ld - on_error: recieved too uch data (more than SSIZE_MAX).\n", self->srv->id);
 			break;
 		case WEBS_ERR_UNEXPECTED_CONTINUTATION:
 			printf("server %ld - on_error: recieved unexpected continuation frame.\n", self->srv->id);
