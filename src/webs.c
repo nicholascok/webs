@@ -372,7 +372,7 @@ void __webs_client_main(webs_client* _self) {
 	/* temporary variables */
 	struct webs_info ws_info;
 	struct webs_frame frm;
-	char* data;
+	char* data = 0;
 	
 	/* wait for HTTP websocket request header */
 	soc_buffer.len = read(_self->fd, soc_buffer.data, WEBS_MAX_PACKET - 1);
