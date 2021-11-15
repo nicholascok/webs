@@ -109,13 +109,3 @@ To send data, use either (1) `webs_send(<self>, <string>)`, where `<self>` is as
 
 ### Shutting Down
 To disconnect a single client use `webs_eject(<self>)`, where `<self>` is the `struct webs_client` pointer of the client. Similarly, to shutdown an entire server use `webs_close(<server>)`, and to block until a server returns from main use `webs_hold(<server>)`.
-
-```
-struct {
-	struct webs_client_node* head; // head of linked list of connected clients
-	struct webs_client_node* tail; // likewise, though tail
-	size_t num_clients; // number of connected clients
-	pthread_t thread; // thread listening for connections
-	int soc; // server socket id
-} __webs_global;
-```
