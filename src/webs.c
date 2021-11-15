@@ -570,7 +570,7 @@ webs_server* webs_start(int _port) {
 	server->events.on_open = webs_default_handler0;
 	server->events.on_close = webs_default_handler0;
 	server->events.on_pong = webs_default_handler0;
-	server->events.on_ping = 0;
+	server->events.on_ping = webs_default_handlerP;
 	
 	server->id = server_id_counter;
 	server_id_counter++;
