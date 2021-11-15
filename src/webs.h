@@ -54,7 +54,7 @@ const uint8_t WEBSFR_RESVRD_MASK[2];
 
 #define WEBS_RESPONSE_FMT "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: %s\r\n\r\n"
 
-#define CAST(X, T) (*((T*) (X)))
+#define CASTP(X, T) (*((T*) (X)))
 
 typedef unsigned char webs_flag_t;
 
@@ -128,6 +128,7 @@ struct webs_server {
 	struct webs_client_node* tail;
 	size_t num_clients;
 	pthread_t thread;
+	size_t id;
 	int soc;
 };
 
@@ -179,7 +180,7 @@ ssize_t webs_asserted_read(int _fd, void* _dst, size_t _n);
  * @param _self: a pointer to the client who sent the frame.
  * @param _frm: a poiter to store the resulting frame data.
  * @return -1 if the frame could not be parsed, or 0 otherwise. */
-int webs_parse_frame(webs_client* _self, struct webs_frame* _frm);
+int __webs_parse_frame(webs_client* _self, struct webs_frame* _frm);
 
 /**
  * generates a websocket frame from the provided data.
@@ -190,7 +191,7 @@ int webs_parse_frame(webs_client* _self, struct webs_frame* _frm);
  * @param _n: the size of the frame's payload data.
  * @param _op: the frame's opcode.
  * @return the total number of resulting bytes copied. */
-int webs_generate_frame(char* _src, char* _dst, ssize_t _n, uint8_t _op);
+int __webs_generate_frame(char* _src, char* _dst, ssize_t _n, uint8_t _op);
 
 /**
  * decodes XOR encrypted data from a websocket frame.
@@ -206,7 +207,7 @@ int webs_decode_data(char* _dta, uint32_t _key, ssize_t _n);
  * @param _rtn: a pointer to store the resulting data.
  * @return -1 on error (bad vers., ill-formed, etc.), or 0
  * otherwise. */
-int webs_process_handshake(char* _src, struct webs_info* _rtn);
+int __webs_process_handshake(char* _src, struct webs_info* _rtn);
 
 /**
  * generates an HTTP websocket handshake response. by the
@@ -219,7 +220,7 @@ int webs_process_handshake(char* _src, struct webs_info* _rtn);
  * @param _key: a pointer to the websocket key provided by the
  * client in it's HTTP websocket request header.
  * @return the total number of resulting bytes copied. */
-int webs_generate_handshake(char* _dst, char* _key);
+int __webs_generate_handshake(char* _dst, char* _key);
 
 /**
  * user function used to send null-terminated data over a
@@ -246,7 +247,7 @@ int webs_sendn(webs_client* _self, char* _data, ssize_t _n);
  * @param _port: the port that the socket should be bound
  * to as a 16-bit integer.
  * @return -1 on error, or 0 otherwise. */
-int bind_address(int _soc, int16_t _port);
+int __webs_bind_address(int _soc, int16_t _port);
 
 /**
  * accepts a connection from a client and provides it with
@@ -254,7 +255,7 @@ int bind_address(int _soc, int16_t _port);
  * @param _soc: the socket that the connection is being requested on.
  * @param _cli: the client that is to be connected.
  * @return -1 on error, or 0 otherwise. */
-int accept_connection(int _soc, webs_client* _c);
+int __webs_accept_connection(int _soc, webs_client* _c);
 
 /**
  * main client function, called on a thread for each

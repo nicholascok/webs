@@ -124,7 +124,7 @@ ssize_t webs_asserted_read(int _fd, void* _dst, size_t _n) {
     return i;
 }
 
-int webs_parse_frame(webs_client* _self, struct webs_frame* _frm) {
+int __webs_parse_frame(webs_client* _self, struct webs_frame* _frm) {
 	ssize_t error;
 	
 	/* read the 2-byte header field */
@@ -175,7 +175,7 @@ int webs_parse_frame(webs_client* _self, struct webs_frame* _frm) {
 	return 0;
 }
 
-int webs_generate_frame(char* _src, char* _dst, ssize_t _n, uint8_t _op) {
+int ____webs_generate_frame(char* _src, char* _dst, ssize_t _n, uint8_t _op) {
 	/* offset to the start of the frame's payload */
 	short data_start = 2;
 	
@@ -190,7 +190,7 @@ int webs_generate_frame(char* _src, char* _dst, ssize_t _n, uint8_t _op) {
 	 * next two bytes */
 	if (_n > 125)
 		WEBSFR_SET_LENGTH(hdr, 126),
-		CAST(_dst + 2, uint16_t) = BIG_ENDIAN_WORD((uint16_t) _n),
+		CASTP(_dst + 2, uint16_t) = BIG_ENDIAN_WORD((uint16_t) _n),
 		data_start = 4;
 	
 	/* if we have more than 2^16 bytes, store the length in
@@ -198,15 +198,15 @@ int webs_generate_frame(char* _src, char* _dst, ssize_t _n, uint8_t _op) {
 	else
 	if (_n > 65536)
 		WEBSFR_SET_LENGTH(hdr, 127),
-		CAST(_dst + 2, uint64_t) = BIG_ENDIAN_QWORD((uint64_t) _n),
+		CASTP(_dst + 2, uint64_t) = BIG_ENDIAN_QWORD((uint64_t) _n),
 		data_start = 10;
 	
 	/* otherwise place the value right in the field */
 	else
-		WEBSFR_SET_LENGTH(hdr, _n),
+		WEBSFR_SET_LENGTH(hdr, _n);
 	
 	/* write header to buffer */
-	CAST(_dst, uint16_t) = hdr;
+	CASTP(_dst, uint16_t) = hdr;
 	
 	/* copy data */
 	memcpy(_dst + data_start, _src, _n);
@@ -224,7 +224,7 @@ int webs_decode_data(char* _dta, uint32_t _key, ssize_t _n) {
 }
 
 /* really ugly, I know... */
-int webs_process_handshake(char* _src, struct webs_info* _rtn) {
+int __webs_process_handshake(char* _src, struct webs_info* _rtn) {
 	char http_vrs_low = 0;
 	
 	char param_str[256];
@@ -272,7 +272,7 @@ int webs_process_handshake(char* _src, struct webs_info* _rtn) {
 	return 0;
 }
 
-int webs_generate_handshake(char* _dst, char* _key) {
+int __webs_generate_handshake(char* _dst, char* _key) {
 	char buf[61]; /* size of result is 60 bytes */
 	char hash[21]; /* SHA-1 hash is 20 bytes */
 	int len = 0;
@@ -301,7 +301,7 @@ int webs_send(webs_client* _self, char* _data) {
 	return write(
 		_self->fd,
 		soc_buffer.data,
-		webs_generate_frame(_data, soc_buffer.data, len, 0x1)
+		____webs_generate_frame(_data, soc_buffer.data, len, 0x1)
 	);
 	
 	return 0;
@@ -317,11 +317,11 @@ int webs_sendn(webs_client* _self, char* _data, ssize_t _n) {
 	return write(
 		_self->fd,
 		soc_buffer.data,
-		webs_generate_frame(_data, soc_buffer.data, _n, 0x1)
+		____webs_generate_frame(_data, soc_buffer.data, _n, 0x1)
 	);
 }
 
-int bind_address(int _soc, int16_t _port) {
+int __webs_bind_address(int _soc, int16_t _port) {
 	struct sockaddr_in soc_addr;
 	int error;
 	
@@ -335,9 +335,9 @@ int bind_address(int _soc, int16_t _port) {
 	return -(error < 0);
 }
 
-int accept_connection(int _soc, webs_client* _c) {
+int __webs_accept_connection(int _soc, webs_client* _c) {
 	/* static id counter variable */
-	static long client_id_counter = 0;
+	static size_t client_id_counter = 0;
 	
 	socklen_t addr_size = sizeof(_c->addr);
 	
@@ -376,11 +376,11 @@ void __webs_client_main(webs_client* _self) {
 	soc_buffer.data[soc_buffer.len] = '\0';
 	
 	/* if we failed, abort */
-	if (webs_process_handshake(soc_buffer.data, &ws_info) < 0)
+	if (__webs_process_handshake(soc_buffer.data, &ws_info) < 0)
 		goto ABORT;
 	
 	/* if we succeeded, generate + tansmit response */
-	soc_buffer.len = webs_generate_handshake(soc_buffer.data, ws_info.webs_key);
+	soc_buffer.len = __webs_generate_handshake(soc_buffer.data, ws_info.webs_key);
 	send(_self->fd, soc_buffer.data, soc_buffer.len, 0);
 	
 	/* call client on_open function */
@@ -388,7 +388,7 @@ void __webs_client_main(webs_client* _self) {
 	
 	/* main loop */
 	for (;;) {
-		if (webs_parse_frame(_self, &frm) < 0) {
+		if (__webs_parse_frame(_self, &frm) < 0) {
 			error = WEBS_ERR_READ_FAILED;
 			break;
 		}
@@ -480,7 +480,7 @@ void __webs_client_main(webs_client* _self) {
 		
 		/* respond to close */
 		if (WEBSFR_GET_OPCODE(frm.info) == 0x8) {
-			soc_buffer.len = webs_generate_frame(data, soc_buffer.data, frm.length, 0x8);
+			soc_buffer.len = ____webs_generate_frame(data, soc_buffer.data, frm.length, 0x8);
 			send(_self->fd, soc_buffer.data, soc_buffer.len, 0);
 			
 			error = 0;
@@ -519,7 +519,7 @@ void __webs_main(webs_server* _srv) {
 	webs_client user;
 	
 	for (;;) {
-		user.fd = accept_connection(_srv->soc, &user);
+		user.fd = __webs_accept_connection(_srv->soc, &user);
 		user.srv = _srv;
 		
 		if (user.fd >= 0)
@@ -531,6 +531,9 @@ void __webs_main(webs_server* _srv) {
 }
 
 webs_server* webs_start(int _port) {
+	/* static id counter variable */
+	static size_t server_id_counter = 0;
+	
 	const int ONE = 1;
 	int error = 0;
 	
@@ -543,7 +546,7 @@ webs_server* webs_start(int _port) {
 	/* allow reconnection to socket (for sanity) */
 	setsockopt(soc, SOL_SOCKET, SO_REUSEADDR, &ONE, sizeof(int));
 	
-	error = bind_address(soc, _port);
+	error = __webs_bind_address(soc, _port);
 	if (error < 0) return 0;
 	
 	error = listen(soc, WEBS_MAX_BACKLOG);
@@ -556,8 +559,11 @@ webs_server* webs_start(int _port) {
 	server->events.on_data = webs_default_handler1;
 	server->events.on_open = webs_default_handler0;
 	server->events.on_close = webs_default_handler0;
-	server->events.on_ping = 0;
 	server->events.on_pong = webs_default_handler0;
+	server->events.on_ping = 0;
+	
+	server->id = server_id_counter;
+	server_id_counter++;
 	
 	/* fork further processing to seperate thread */
 	pthread_create(&server->thread, 0, (void*(*)(void*)) __webs_main, server);
