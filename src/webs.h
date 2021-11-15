@@ -109,6 +109,7 @@ enum webs_error {
 int webs_default_handler0(struct webs_client* _self);
 int webs_default_handler1(struct webs_client* _self, char* _data, ssize_t _n);
 int webs_default_handler2(struct webs_client* _self, enum webs_error _ec);
+int webs_default_handlerP(struct webs_client* _self);
 
 /* user implemented event handlers */
 struct webs_event_list {
@@ -116,8 +117,8 @@ struct webs_event_list {
 	int (*on_data )(struct webs_client*, char*, ssize_t);
 	int (*on_open )(struct webs_client*);
 	int (*on_close)(struct webs_client*);
-	int (*on_ping)(struct webs_client*);
 	int (*on_pong)(struct webs_client*);
+	int (*on_ping)(struct webs_client*);
 };
 
 struct webs_server {
@@ -236,6 +237,11 @@ int webs_send(webs_client* _self, char* _data);
  * @param _n: the number of bytes that are to be sent.
  * @return the result of the write. */
 int webs_sendn(webs_client* _self, char* _data, ssize_t _n);
+
+/**
+ * sends a pong frame to a client over a websocket.
+ * @param _self: the client that the pong is to be sent to.*/
+void webs_pong(webs_client* _self);
 
 /**
  * binds a socket to an address and port.

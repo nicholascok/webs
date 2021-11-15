@@ -16,6 +16,7 @@ const uint8_t WEBSFR_RESVRD_MASK[2] = {0x70, 0x00};
 int webs_default_handler0(struct webs_client* _self) { return 0; }
 int webs_default_handler1(struct webs_client* _self, char* _data, ssize_t _n) { return 0; }
 int webs_default_handler2(struct webs_client* _self, enum webs_error _ec) { return 0; }
+int webs_default_handlerP(struct webs_client* _self) { webs_pong(_self); return 0; }
 
 #include "webs_string.inc"
 #include "webs_sha1.inc"
@@ -324,6 +325,11 @@ int webs_sendn(webs_client* _self, char* _data, ssize_t _n) {
 	);
 }
 
+void webs_pong(webs_client* _self) {
+	webs_sendn(_self, (char*) &PONG, 2);
+	return;
+}
+
 int __webs_bind_address(int _soc, int16_t _port) {
 	struct sockaddr_in soc_addr;
 	int error;
@@ -407,22 +413,19 @@ void __webs_client_main(webs_client* _self) {
 			webs_flush(_self->fd, frm.off + frm.length - 2);
 			continue;
 		}
+		
+		/* check if packet is too big */
 		if ((size_t) frm.length > WEBS_SSIZE_MAX) {
 			(*_self->srv->events.on_error)(_self, WEBS_ERR_OVERFLOW);
 			webs_flush(_self->fd, frm.off + frm.length - 2);
+			continue;
 		}
 		
 		/* respond to ping */
 		if (WEBSFR_GET_OPCODE(frm.info) == 0x9) {
 			webs_flush(_self->fd, frm.off + frm.length - 2);
-			
-			if (_self->srv->events.on_ping)
-				(*_self->srv->events.on_ping)(_self);
-			
-			else {
-				webs_sendn(_self, (char*) &PONG, 2);
-				continue;
-			}
+			(*_self->srv->events.on_ping)(_self);
+			continue;
 		}
 		
 		/* handle pong */
