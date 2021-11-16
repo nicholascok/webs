@@ -1,4 +1,4 @@
-# crd_webs
+# webs
 C89 compliant websocket server library.
 
 ## Usage
