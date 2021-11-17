@@ -8,6 +8,8 @@ C89 compliant websocket server library.
 ```
 #include ".../path/to/webs.c"
 
+/* code... */
+
 int main(void) {
 	const int port0 = 7752;
 	const int port1 = 7754;
