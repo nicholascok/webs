@@ -1,5 +1,4 @@
-#ifndef __WEBS_STRING_H__
-#define __WEBS_STRING_H__
+#include "webs_string.h"
 
 int str_cat(char* _buf, char* _a, char* _b) {
 	int len = 0;
@@ -22,5 +21,3 @@ int str_cmp_insensitive(char* _a, char* _b) {
 		if (!_a[i] && !_b[i]) return 1;
 	return 0;
 }
-
-#endif

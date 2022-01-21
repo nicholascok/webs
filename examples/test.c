@@ -1,4 +1,4 @@
-#include "../src/webs.c"
+#include "../src/webs.h"
 
 int myFunc0(webs_client* self) {
 	printf("server %ld: (id %ld) connected!\n", self->srv->id, self->id);
@@ -16,8 +16,6 @@ int myFuncZ(webs_client* self) {
 }
 
 int myFunc1(webs_client* self, char* data, ssize_t len) {
-	size_t i;
-	
 	if (len < 16384)
 	printf("server %ld: (id %ld) data [ %s ] (%lu bytes)\n", self->srv->id, self->id, data, len);
 	
@@ -49,7 +47,7 @@ int myFunc3(webs_client* self, enum webs_error err) {
 			printf("server %ld - on_error: frame opcode unsupported.\n", self->srv->id);
 			break;
 		case WEBS_ERR_OVERFLOW:
-			printf("server %ld - on_error: recieved too uch data (more than SSIZE_MAX).\n", self->srv->id);
+			printf("server %ld - on_error: recieved too much data (more than SSIZE_MAX).\n", self->srv->id);
 			break;
 		case WEBS_ERR_UNEXPECTED_CONTINUTATION:
 			printf("server %ld - on_error: recieved unexpected continuation frame.\n", self->srv->id);
@@ -73,10 +71,10 @@ int main(void) {
 	server0->events.on_close = myFunc2;
 	server0->events.on_error = myFunc3;
 	
+	/* not all handlers need to be set... */
 	server1->events.on_open = myFuncZ;
-	server1->events.on_data = myFunc1;
 	server1->events.on_close = myFunc2;
-	server1->events.on_error = myFunc3;
+	server1->events.on_data = myFunc1;
 	
 	webs_hold(server0);
 	webs_hold(server1);

@@ -1,2 +1,21 @@
-all:
-	gcc -o test ./examples/test.c -lpthread -Wall -Wextra -Wpedantic -std=c90 -Wno-cast-function-type -Wno-unused-variable -Wno-unused-parameter -Wno-unused-but-set-variable -O0 
+CFLAGS := -Wall -Wextra -Wpedantic -Wno-unused-parameter -Wno-cast-function-type
+STD := c89
+CC := gcc
+
+all: compile build
+
+compile:
+	@echo "build options:"
+	@echo "CFLAGS = ${CFLAGS}"
+	@echo "STD    = ${STD}"
+	@echo "CC     = ${CC}"
+	@echo
+	
+	$(CC) -c src/*.c examples/test.c $(CFLAGS) -std=$(STD)
+
+build: compile
+	$(CC) -o webs *.o -lpthread
+
+clean:
+	-rm -f webs
+	-rm -f *.o
