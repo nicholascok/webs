@@ -134,20 +134,6 @@ enum webs_error {
 };
 
 /* 
- * declare masks in an endian-independant way.
- */
-extern uint8_t WEBSFR_LENGTH_MASK[2];
-extern uint8_t WEBSFR_OPCODE_MASK[2];
-extern uint8_t WEBSFR_MASKED_MASK[2];
-extern uint8_t WEBSFR_FINISH_MASK[2];
-extern uint8_t WEBSFR_RESVRD_MASK[2];
-
-/* headers for sending ping / pong requests, as above.
- */
-extern uint8_t WEBS_PING[2];
-extern uint8_t WEBS_PONG[2];
-
-/* 
  * stores header data from a websocket frame.
  */
 struct webs_frame {
@@ -220,6 +206,20 @@ struct webs_client_node {
 	struct webs_client_node* next;
 	struct webs_client_node* prev;
 };
+
+/* 
+ * declare masks in an endian-independant way.
+ */
+extern uint8_t WEBSFR_LENGTH_MASK[2];
+extern uint8_t WEBSFR_OPCODE_MASK[2];
+extern uint8_t WEBSFR_MASKED_MASK[2];
+extern uint8_t WEBSFR_FINISH_MASK[2];
+extern uint8_t WEBSFR_RESVRD_MASK[2];
+
+/* headers for sending ping / pong requests, as above.
+ */
+extern uint8_t WEBS_PING[2];
+extern uint8_t WEBS_PONG[2];
 
 /**
  * checks a client out of the server to which it is connected.

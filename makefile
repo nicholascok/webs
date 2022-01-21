@@ -1,4 +1,4 @@
-CFLAGS := -Wall -Wextra -Wpedantic -Wno-unused-parameter -Wno-cast-function-type -Wno-overlength-strings
+CFLAGS := -Wall -Wextra -Wpedantic -Wno-overlength-strings
 STD := c89
 CC := gcc
 
@@ -17,5 +17,5 @@ build: compile
 	$(CC) -o webs *.o -lpthread
 
 clean:
-	-rm -f webs
+	-rm -f webs 
 	-rm -f *.o
