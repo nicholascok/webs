@@ -1,5 +1,5 @@
 # webs
-simple compliant websocket server library.
+simple websocket server library.
 
 ## Usage
 
