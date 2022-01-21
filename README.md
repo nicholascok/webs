@@ -2,7 +2,6 @@
 C89 compliant websocket server library.
 
 ## Usage
-**Note:** requires compilation with `-lpthread`  
 
 ### Starting a Server
 ```
