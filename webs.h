@@ -69,7 +69,7 @@
  * make sure SSIZE_MAX is defined.
  */
 #ifndef SSIZE_MAX
-	#define SSIZE_MAX (((size_t) (~0)) >> 1)
+	#define SSIZE_MAX ( (~((size_t) 0)) >> 1 )
 #endif
 
 /* 
