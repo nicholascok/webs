@@ -8,16 +8,62 @@
 
 #include <pthread.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-#include "webs_endian.h"
-#include "webs_string.h"
-#include "webs_sha1.h"
-#include "webs_b64.h"
-#include "error.h"
+/* 
+ * macros to report runtime errors...
+ */
+#define __WEBS_XE_PASTE_WRAPPER(x) __WEBS_XE_PASTE_RAW(x)
+#define __WEBS_XE_PASTE_RAW(x) #x
+#define __WEBS_XE_PASTE(V) __WEBS_XE_PASTE_WRAPPER(V)
+
+#if __STDC_VERSION__ > 199409L
+	#ifdef NOESCAPE
+		#define WEBS_XERR(MESG, ERR) { printf("Runtime Error: (in "__WEBS_XE_PASTE(__FILE__)", func: %s [line "__WEBS_XE_PASTE(__LINE__)"]) : "MESG"\n", __func__); exit(ERR); }
+	#else
+		#define WEBS_XERR(MESG, ERR) { printf("\x1b[31m\x1b[1mRuntime Error: \x1b[0m(in "__WEBS_XE_PASTE(__FILE__)", func: \x1b[1m%s\x1b[0m [line \x1b[1m"__WEBS_XE_PASTE(__LINE__)"\x1b[0m]) : "MESG"\n", __func__); exit(ERR); }
+	#endif
+#else
+	#ifdef NOESCAPE
+		#define WEBS_XERR(MESG, ERR) { printf("Runtime Error: (in "__WEBS_XE_PASTE(__FILE__)", line "__WEBS_XE_PASTE(__LINE__)") : "MESG"\n"); exit(ERR); }
+	#else
+		#define WEBS_XERR(MESG, ERR) { printf("\x1b[31m\x1b[1mRuntime Error: \x1b[0m(in "__WEBS_XE_PASTE(__FILE__)", line \x1b[1m"__WEBS_XE_PASTE(__LINE__)"\x1b[0m) : "MESG"\n"); exit(ERR); }
+	#endif
+#endif
+
+
+/* 
+ * declare endian-independant macros
+ */
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+	
+	#define WEBS_BIG_ENDIAN_WORD(X) X
+	
+	#define WEBS_BIG_ENDIAN_DWORD(X) X
+	
+	#define WEBS_BIG_ENDIAN_QWORD(X) X
+	
+#else
+	
+	#if __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__
+		#warning could not determine system endianness (assumng little endian).
+	#endif
+	
+	#define WEBS_BIG_ENDIAN_WORD(X) (((X << 8) & 0xFF00) | ((X >> 8) & 0x00FF))
+	
+	#define WEBS_BIG_ENDIAN_DWORD(X) ((uint32_t) (\
+		(((uint32_t) X >> 24) & 0x000000FFUL) |\
+		(((uint32_t) X >> 8 ) & 0x0000FF00UL) |\
+		(((uint32_t) X << 8 ) & 0x00FF0000UL) |\
+		(((uint32_t) X << 24) & 0xFF000000UL)))
+	
+	#define WEBS_BIG_ENDIAN_QWORD(X) ( __WEBS_BIG_ENDIAN_QWORD(X) )
+	
+#endif
 
 /* 
  * make sure SSIZE_MAX is defined.
@@ -41,17 +87,17 @@
  * macros for extracting bitwise data from a websocket frame's 16-bit
  * header.
  */
-#define WEBSFR_GET_LENGTH(H) ((H & *((uint16_t*) &WEBSFR_LENGTH_MASK)) >> 8 )
-#define WEBSFR_GET_OPCODE(H) ((H & *((uint16_t*) &WEBSFR_OPCODE_MASK)) >> 0 )
-#define WEBSFR_GET_MASKED(H) ((H & *((uint16_t*) &WEBSFR_MASKED_MASK)) >> 15)
-#define WEBSFR_GET_FINISH(H) ((H & *((uint16_t*) &WEBSFR_FINISH_MASK)) >> 7 )
-#define WEBSFR_GET_RESVRD(H) ((H & *((uint16_t*) &WEBSFR_RESVRD_MASK)) >> 4 )
+#define WEBSFR_GET_LENGTH(H) ( ((uint8_t*) &H)[1] & WEBSFR_LENGTH_MASK[1] )
+#define WEBSFR_GET_OPCODE(H) ( ((uint8_t*) &H)[0] & WEBSFR_OPCODE_MASK[0] )
+#define WEBSFR_GET_MASKED(H) ( ((uint8_t*) &H)[1] & WEBSFR_MASKED_MASK[1] )
+#define WEBSFR_GET_FINISH(H) ( ((uint8_t*) &H)[0] & WEBSFR_FINISH_MASK[0] )
+#define WEBSFR_GET_RESVRD(H) ( ((uint8_t*) &H)[0] & WEBSFR_RESVRD_MASK[0] )
 
-#define WEBSFR_SET_LENGTH(H, V) (H |= ((uint16_t) ((uint8_t) V & 0x7F) << 8 ))
-#define WEBSFR_SET_OPCODE(H, V) (H |= ((uint16_t) ((uint8_t) V & 0x0F) << 0 ))
-#define WEBSFR_SET_MASKED(H, V) (H |= ((uint16_t) ((uint8_t) V & 0x01) << 15))
-#define WEBSFR_SET_FINISH(H, V) (H |= ((uint16_t) ((uint8_t) V & 0x01) << 7 ))
-#define WEBSFR_SET_RESVRD(H, V) (H |= ((uint16_t) ((uint8_t) V & 0x07) << 4 ))
+#define WEBSFR_SET_LENGTH(H, V) ( ((uint8_t*) &H)[1] |= V & 0x7F )
+#define WEBSFR_SET_OPCODE(H, V) ( ((uint8_t*) &H)[0] |= V & 0x0F )
+#define WEBSFR_SET_MASKED(H, V) ( ((uint8_t*) &H)[1] |= (V << 7) & 0x80 )
+#define WEBSFR_SET_FINISH(H, V) ( ((uint8_t*) &H)[0] |= (V << 7) & 0x80 )
+#define WEBSFR_SET_RESVRD(H, V) ( ((uint8_t*) &H)[0] |= (V << 4) & 0x70 )
 
 /* 
  * HTTP response format for confirming a websocket connection.
@@ -59,9 +105,19 @@
 #define WEBS_RESPONSE_FMT "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: %s\r\n\r\n"
 
 /* 
+ * macro to convert an integer to its base-64 representation.
+ */
+#define TO_B64(X) ("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"[X])
+
+/* 
  * cast macro (can be otherwise pretty ugly)
  */
 #define CASTP(X, T) (*((T*) (X)))
+
+/* 
+ * bitwise rotate left
+ */
+#define ROL(X, N) ((X << N) | (X >> ((sizeof(X) * 8) - N)))
 
 typedef struct webs_server webs_server;
 typedef struct webs_client webs_client;
@@ -165,22 +221,10 @@ struct webs_client_node {
 	struct webs_client_node* prev;
 };
 
-/* default handlers for client events */
-int webs_default_handler0(struct webs_client* _self);
-int webs_default_handler1(struct webs_client* _self, char* _data, ssize_t _n);
-int webs_default_handler2(struct webs_client* _self, enum webs_error _ec);
-int webs_default_handlerP(struct webs_client* _self);
-
-/**
- * removes a client from a server's internal listing.
- * @param _node: a pointer to the client in the server's listing.
- * @note for user functions, passing self (a webs_client pointer) is suffice.
- */
-void webs_remove_client(struct webs_client_node* _node);
-
 /**
  * checks a client out of the server to which it is connected.
  * @param _self: the client to be ejected.
+ * @note for user functions, passing self (a webs_client pointer) is suffice.
  */
 void webs_eject(webs_client* _self);
 
@@ -189,23 +233,6 @@ void webs_eject(webs_client* _self);
  * @param _srv: the server that is to be shut down.
  */
 void webs_close(webs_server* _srv);
-
-/**
- * wraper functon that deals with reading lage amounts
- * of data, as well as attemts to complete partial reads.
- * @param _fd: the file desciptor to be read from.
- * @param _dst: a buffer to store the resulting data.
- * @param _n: the number of bytes to be read.
- */
-ssize_t webs_asserted_read(int _fd, void* _dst, size_t _n);
-
-/**
- * decodes XOR encrypted data from a websocket frame.
- * @param _dta: a pointer to the data that is to be decrypted.
- * @param _key: a 32-bit key used to decrypt the data.
- * @param _n: the number of bytes of data to be decrypted.
- */
-int webs_decode_data(char* _dta, uint32_t _key, ssize_t _n);
 
 /**
  * user function used to send null-terminated data over a
@@ -249,5 +276,11 @@ int webs_hold(webs_server* _srv);
  * to the newly created server otherwise.
  */
 webs_server* webs_start(int _port);
+
+/* 
+ * C89 doesn't officially support 64-bt integer constants, so
+ * thats why this mess is here...  (there is a better way)
+ */
+uint64_t __WEBS_BIG_ENDIAN_QWORD(uint64_t _x);
 
 #endif /* __WEBS_H__ */

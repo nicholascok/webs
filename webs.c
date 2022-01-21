@@ -10,48 +10,238 @@ uint8_t WEBSFR_MASKED_MASK[2] = {0x00, 0x80};
 uint8_t WEBSFR_FINISH_MASK[2] = {0x80, 0x00};
 uint8_t WEBSFR_RESVRD_MASK[2] = {0x70, 0x00};
 
-int webs_default_handler0(struct webs_client* _self) { return 0; }
-int webs_default_handler1(struct webs_client* _self, char* _data, ssize_t _n) { return 0; }
-int webs_default_handler2(struct webs_client* _self, enum webs_error _ec) { return 0; }
-int webs_default_handlerP(struct webs_client* _self) { webs_pong(_self); return 0; }
+/* 
+ * strcat that write result to a buffer...
+ */
+static int __webs_strcat(char* _buf, char* _a, char* _b) {
+	int len = 0;
+	while (*_a) *(_buf++) = *(_a++), len++;
+	while (*_b) *(_buf++) = *(_b++), len++;
+	*_buf = '\0';
+	return len;
+}
 
 /* 
- * adds a client to a server's internal listing.
- * @param _srv: the server that the client should be added to.
- * @param _cli: the client to be added.
- * @return a pointer to the added client in the server's listing.
- * (or NULL if NULL was provided)
+ * C89 doesn't officially support 64-bt integer constants, so
+ * thats why this mess is here...  (there is a better way)
  */
-static webs_client* __webs_add_client(webs_server* _srv, webs_client _cli) {
-	if (_srv == NULL) return NULL;
+uint64_t __WEBS_BIG_ENDIAN_QWORD(uint64_t _x) {
+	((uint32_t*) &_x)[0] = WEBS_BIG_ENDIAN_DWORD(((uint32_t*) &_x)[0]);
+	((uint32_t*) &_x)[1] = WEBS_BIG_ENDIAN_DWORD(((uint32_t*) &_x)[1]);
+	((uint32_t*) &_x)[0] ^= ((uint32_t*) &_x)[1];
+	((uint32_t*) &_x)[1] ^= ((uint32_t*) &_x)[0];
+	((uint32_t*) &_x)[0] ^= ((uint32_t*) &_x)[1];
+	return _x;
+}
+
+/* 
+ * takes the SHA-1 hash of `_n` bytes of data (pointed to by `_s`),
+ * storing the 160-bit (20-byte) result in the buffer pointed to by `_d`.
+ */
+static int __webs_sha1(char* _s, char* _d, uint64_t _n) {
+	uint64_t raw_bits = _n * 8;     	/* length of message in bits */
+	uint32_t a, b, c, d, e, f, k, t;	/* internal temporary variables */
+	uint64_t C, O, i;               	/* iteration variables */
+	short j;                        	/* likewise */
 	
-	/* if this is first client, set head = tail = new element */
-	if (_srv->tail == NULL) {
-		_srv->tail = _srv->head = malloc(sizeof(struct webs_client_node));
+	uint8_t* ptr = (uint8_t*) _s;	/* pointer to active chunk data */
+	uint32_t wrds[80];           	/* used in main loop */
+	
+	/* constants */
+	uint32_t h0 = 0x67452301;
+	uint32_t h1 = 0xEFCDAB89;
+	uint32_t h2 = 0x98BADCFE;
+	uint32_t h3 = 0x10325476;
+	uint32_t h4 = 0xC3D2E1F0;
+	
+	/* pad the message length (plus one so that a bit can
+	 * be appended to the message, as per the specification)
+	 * so it is congruent to 56 modulo 64, all in bytes,
+	 * then add 8 bytes for the 64-bit length field */
+	
+	/* equivelanl, ((56 - (_n + 1)) MOD 64) + (_n + 1) + 8,
+	 * where `a MOD b` is the POSITIVE remainder after a is
+	 * divided by b */
+	uint64_t pad_n = _n + ((55 - _n) & 63) + 9;
+	
+	uint64_t num_chks = pad_n / 64;	/* number of chunks to be rocessed */
+	uint16_t rem_chks_begin = 0;   	/* the first chunk with extended data */
+	uint16_t offset = pad_n - 128; 	/* start index for extended data */
+	
+	/* buffer to store extended chunk data (i.e. data that goes past the
+	 * smallest multiple of 64 bytes less than `_n`) (to avoid having to
+	 * make an allocation)*/
+	uint8_t ext[128] = {0};
+	
+	/* if n is less than 120 bytes, then we can store the expanded data
+	 * directly in our buffer */
+	if (_n < 120) {
+		*((uint64_t*) &ext[pad_n - 8]) = WEBS_BIG_ENDIAN_QWORD(raw_bits);
+		ext[_n] = 0x80;
 		
-		if (_srv->tail == NULL)
-			XERR("Failed to allocate memory!", ENOMEM);
-		
-		_srv->head->prev = NULL;
+		for (i = 0; i < _n; i++)
+			ext[i] = _s[i];
 	}
 	
-	/* otherwise, just add after the current tail */
+	/* otherwise, we will save our buffer for the last two chunks */
 	else {
-		_srv->tail->next = malloc(sizeof(struct webs_client_node));
+		rem_chks_begin = num_chks - 2;
 		
-		if (_srv->tail->next == NULL)
-			XERR("Failed to allocate memory!", ENOMEM);
+		ext[_n - offset] = 0x80;
+		*((uint64_t*) &ext[120]) = WEBS_BIG_ENDIAN_QWORD(raw_bits);
 		
-		_srv->tail->next->prev = _srv->tail;
-		_srv->tail = _srv->tail->next;
+		for (i = 0; i < _n - offset; i++)
+			ext[i] = _s[offset + i];
 	}
 	
-	_srv->tail->client = _cli;
-	_srv->tail->next = NULL;
+	/* main loop (very similar to example in specification) */
+	for (C = O = 0; C < num_chks; C++, O++) {
+		if (C == rem_chks_begin) ptr = ext, O = 0;
+		
+		for (j = 0; j < 16; j++)
+			wrds[j] = WEBS_BIG_ENDIAN_DWORD(((uint32_t*) ptr)[j]);
+		
+		for (j = 16; j < 80; j++) 
+			wrds[j] = ROL((wrds[j - 3] ^ wrds[j - 8] ^
+				wrds[j - 14] ^ wrds[j - 16]), 1);
+		
+		a = h0; b = h1; c = h2;
+		d = h3; e = h4;
+		
+		for (j = 0; j < 80; j++) {
+			if (j < 20)
+				f = ((b & c) | ((~b) & d)),
+				k = 0x5A827999;
+			
+			else
+			if (j < 40)
+				f = (b ^ c ^ d),
+				k = 0x6ED9EBA1;
+			
+			else
+			if (j < 60)
+				f = ((b & c) | (b & d) | (c & d)),
+				k = 0x8F1BBCDC;
+			
+			else
+				f = (b ^ c ^ d),
+				k = 0xCA62C1D6;
+			
+			t = ROL(a, 5) + f + e + k + wrds[j];
+			
+			e = d; d = c;
+			c = ROL(b, 30);
+			b = a; a = t;
+		}
+		
+		h0 = h0 + a; h1 = h1 + b;
+		h2 = h2 + c; h3 = h3 + d;
+		h4 = h4 + e;
+		
+		ptr += 64;
+	}
 	
-	_srv->num_clients++;
+	/* copy data into destination */
+	((uint32_t*) _d)[0] = WEBS_BIG_ENDIAN_DWORD(h0);
+	((uint32_t*) _d)[1] = WEBS_BIG_ENDIAN_DWORD(h1);
+	((uint32_t*) _d)[2] = WEBS_BIG_ENDIAN_DWORD(h2);
+	((uint32_t*) _d)[3] = WEBS_BIG_ENDIAN_DWORD(h3);
+	((uint32_t*) _d)[4] = WEBS_BIG_ENDIAN_DWORD(h4);
 	
-	return &_srv->tail->client;
+	return 0;
+}
+
+/* 
+ * Encodes `_n` bytes of data (pointed to by `_s`) into
+ * base-64, storing the result as a null terminating string
+ * in `_d`. The number of successfully written bytes is
+ * returned.
+ */
+static int __webs_b64_encode(char* _s, char* _d, size_t _n) {
+	size_t i = 0; /* iteration variable */
+	
+	/* `n_max` is the number of base-64 chars we
+	 * expect to output in the main loop */
+	size_t n_max;
+	
+	/* belay data past a multiple of 3 bytes - so
+	 * we end on a whole number of encoded chars in
+	 * the main loop. */
+	int rem = _n % 3;
+	_n -= rem;
+	
+	n_max = (_n * 4) / 3;
+	
+	/* process bulk of data */
+	while (i < n_max) {
+		_d[i + 0] = TO_B64(( _s[0] & 0xFC) >> 2);
+		_d[i + 1] = TO_B64(((_s[0] & 0x03) << 4) | ((_s[1] & 0xF0) >> 4));
+		_d[i + 2] = TO_B64(((_s[1] & 0x0F) << 2) | ((_s[2] & 0xC0) >> 6));
+		_d[i + 3] = TO_B64(  _s[2] & 0x3F);
+		_s += 3, i += 4;
+	}
+	
+	/* deal with remaining bytes (some may need to
+	 * be 0-padded if the data is not a multiple of
+	 * 6-bits - the length of a base-64 digit) */
+	if (rem == 1)
+		_d[i + 0] = TO_B64((_s[0] & 0xFC) >> 2),
+		_d[i + 1] = TO_B64((_s[0] & 0x03) << 4),
+		_d[i + 2] = '=',
+		_d[i + 3] = '=';
+	
+	else
+	if (rem == 2)
+		_d[i + 0] = TO_B64(( _s[0] & 0xFC) >> 2),
+		_d[i + 1] = TO_B64(((_s[0] & 0x03) << 4) | ((_s[1] & 0xF0) >> 4)),
+		_d[i + 2] = TO_B64(( _s[1] & 0x0F) << 2),
+		_d[i + 3] = '=';
+	
+	_d[i + 4] = '\0';
+	
+	return i + 4;
+}
+
+/* 
+ * wraper functon that deals with reading lage amounts
+ * of data, as well as attemts to complete partial reads.
+ * @param _fd: the file desciptor to be read from.
+ * @param _dst: a buffer to store the resulting data.
+ * @param _n: the number of bytes to be read.
+ */
+static ssize_t __webs_asserted_read(int _fd, void* _dst, size_t _n) {
+    ssize_t bytes_read;
+	size_t size = 32768;
+    size_t i;
+	
+    for (i = 0; i < _n;) {
+		if (_n - i < size)
+			size = _n - i;
+		
+		bytes_read = read(_fd, (char*) _dst + i, size);
+		
+		if (bytes_read < 0)
+			return -1;
+		
+		i += bytes_read;
+    }
+	
+    return i;
+}
+
+/* 
+ * decodes XOR encrypted data from a websocket frame.
+ * @param _dta: a pointer to the data that is to be decrypted.
+ * @param _key: a 32-bit key used to decrypt the data.
+ * @param _n: the number of bytes of data to be decrypted.
+ */
+static int __webs_decode_data(char* _dta, uint32_t _key, ssize_t _n) {
+	ssize_t i;
+	
+	for (i = 0; i < _n; i++)
+		_dta[i] ^= ((char*) &_key)[i % 4];
+	
+	return 0;
 }
 
 /* 
@@ -91,7 +281,7 @@ static int __webs_parse_frame(webs_client* _self, struct webs_frame* _frm) {
 	ssize_t error;
 	
 	/* read the 2-byte header field */
-	error = webs_asserted_read(_self->fd, &_frm->info, 2);
+	error = __webs_asserted_read(_self->fd, &_frm->info, 2);
 	if (error < 0) return -1; /* read(2) error, maybe broken pipe */
 	
 	/* read the length field (may offset payload) */
@@ -99,21 +289,21 @@ static int __webs_parse_frame(webs_client* _self, struct webs_frame* _frm) {
 	
 	/* a value of 126 here says to interpret the next two bytes */
 	if (WEBSFR_GET_LENGTH(_frm->info) == 126) {
-		error = webs_asserted_read(_self->fd, &_frm->length, 2);
+		error = __webs_asserted_read(_self->fd, &_frm->length, 2);
 		if (error < 0) return -1; /* read(2) error, maybe broken pipe */
 		
 		_frm->off = 4;
-		_frm->length = BIG_ENDIAN_WORD(_frm->length);
+		_frm->length = WEBS_BIG_ENDIAN_WORD(_frm->length);
 	}
 	
 	/* a value of 127 says to interpret the next eight bytes */
 	else
 	if (WEBSFR_GET_LENGTH(_frm->info) == 127) {
-		error = webs_asserted_read(_self->fd, &_frm->length, 8);
+		error = __webs_asserted_read(_self->fd, &_frm->length, 8);
 		if (error < 0) return -1; /* read(2) error, maybe broken pipe */
 		
 		_frm->off = 10;
-		_frm->length = BIG_ENDIAN_QWORD(_frm->length);
+		_frm->length = WEBS_BIG_ENDIAN_QWORD(_frm->length);
 	}
 	
 	/* otherwise, the raw value is used */
@@ -122,7 +312,7 @@ static int __webs_parse_frame(webs_client* _self, struct webs_frame* _frm) {
 	/* if the data is masked, the payload is further offset
 	 * to fit a four byte key */
 	if (WEBSFR_GET_MASKED(_frm->info)) {
-		error = webs_asserted_read(_self->fd, &_frm->key, 4);
+		error = __webs_asserted_read(_self->fd, &_frm->key, 4);
 		if (error < 1) return -1; /* read(2) error, maybe broken pipe */
 	}
 	
@@ -148,7 +338,8 @@ static int __webs_parse_frame(webs_client* _self, struct webs_frame* _frm) {
  * @param _op: the frame's opcode.
  * @return the total number of resulting bytes copied.
  */
-static int __webs_generate_frame(char* _src, char* _dst, ssize_t _n, uint8_t _op) {
+static int __webs_make_frame(char* _src, char* _dst, ssize_t _n, uint8_t _op) {
+	
 	/* offset to the start of the frame's payload */
 	short data_start = 2;
 	
@@ -163,7 +354,7 @@ static int __webs_generate_frame(char* _src, char* _dst, ssize_t _n, uint8_t _op
 	 * next two bytes */
 	if (_n > 125) {
 		WEBSFR_SET_LENGTH(hdr, 126);
-		CASTP(_dst + 2, uint16_t) = BIG_ENDIAN_WORD((uint16_t) _n);
+		CASTP(_dst + 2, uint16_t) = WEBS_BIG_ENDIAN_WORD((uint16_t) _n);
 		data_start = 4;
 	}
 	
@@ -172,7 +363,7 @@ static int __webs_generate_frame(char* _src, char* _dst, ssize_t _n, uint8_t _op
 	else
 	if (_n > 65536) {
 		WEBSFR_SET_LENGTH(hdr, 127);
-		CASTP(_dst + 2, uint64_t) = BIG_ENDIAN_QWORD((uint64_t) _n);
+		CASTP(_dst + 2, uint64_t) = WEBS_BIG_ENDIAN_QWORD((uint64_t) _n);
 		data_start = 10;
 	}
 	
@@ -216,8 +407,9 @@ static int __webs_process_handshake(char* _src, struct webs_info* _rtn) {
 	
 	_src += nbytes;
 	
-	if (!str_cmp(req_type, "GET"))
+	if (strcmp(req_type, "GET"))
 		return -1;
+			printf("asfasf\n");
 	
 	_rtn->http_vrs <<= 8;
 	_rtn->http_vrs += http_vrs_low;
@@ -225,13 +417,13 @@ static int __webs_process_handshake(char* _src, struct webs_info* _rtn) {
 	while (sscanf(_src, "%s%n", param_str, &nbytes) > 0) {
 		_src += nbytes;
 		
-		if (str_cmp(param_str, "Sec-WebSocket-Version:")) {
+		if (!strcmp(param_str, "Sec-WebSocket-Version:")) {
 			sscanf(_src, "%hu%*[^\r]\r%n", &_rtn->webs_vrs, &nbytes);
 			_src += nbytes;
 		}
 		
 		else
-		if (str_cmp(param_str, "Sec-WebSocket-Key:")) {
+		if (!strcmp(param_str, "Sec-WebSocket-Key:")) {
 			sscanf(_src, "%s%*[^\r]\r%n", _rtn->webs_key, &nbytes);
 			_src += nbytes;
 		}
@@ -265,12 +457,70 @@ static int __webs_generate_handshake(char* _dst, char* _key) {
 	char hash[21];	/* SHA-1 hash is 20 bytes */
 	int len = 0;
 	
-	len = str_cat(buf, _key, "258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
-	webs_sha1(buf, hash, len);
-	len = webs_b64_encode(hash, buf, 20);
+	len = __webs_strcat(buf, _key, "258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
+	__webs_sha1(buf, hash, len);
+	len = __webs_b64_encode(hash, buf, 20);
 	buf[len] = '\0';
 	
 	return sprintf(_dst, WEBS_RESPONSE_FMT, buf);
+}
+
+/* 
+ * removes a client from a server's internal listing.
+ * @param _node: a pointer to the client in the server's listing.
+ */
+static void __webs_remove_client(struct webs_client_node* _node) {
+	if (_node == NULL) return;
+	
+	if (_node->prev)
+		_node->prev->next = _node->next;
+	
+	if (_node->next)
+		_node->next->prev = _node->prev;
+	
+	_node->client.srv->num_clients--;
+	free(_node);
+	
+	return;
+}
+
+/* 
+ * adds a client to a server's internal listing.
+ * @param _srv: the server that the client should be added to.
+ * @param _cli: the client to be added.
+ * @return a pointer to the added client in the server's listing.
+ * (or NULL if NULL was provided)
+ */
+static webs_client* __webs_add_client(webs_server* _srv, webs_client _cli) {
+	if (_srv == NULL) return NULL;
+	
+	/* if this is first client, set head = tail = new element */
+	if (_srv->tail == NULL) {
+		_srv->tail = _srv->head = malloc(sizeof(struct webs_client_node));
+		
+		if (_srv->tail == NULL)
+			WEBS_XERR("Failed to allocate memory!", ENOMEM);
+		
+		_srv->head->prev = NULL;
+	}
+	
+	/* otherwise, just add after the current tail */
+	else {
+		_srv->tail->next = malloc(sizeof(struct webs_client_node));
+		
+		if (_srv->tail->next == NULL)
+			WEBS_XERR("Failed to allocate memory!", ENOMEM);
+		
+		_srv->tail->next->prev = _srv->tail;
+		_srv->tail = _srv->tail->next;
+	}
+	
+	_srv->tail->client = _cli;
+	_srv->tail->next = NULL;
+	
+	_srv->num_clients++;
+	
+	return &_srv->tail->client;
 }
 
 /* 
@@ -354,7 +604,9 @@ static void __webs_client_main(webs_client* _self) {
 		goto ABORT;
 	
 	/* if we succeeded, generate + tansmit response */
-	soc_buffer.len = __webs_generate_handshake(soc_buffer.data, ws_info.webs_key);
+	soc_buffer.len = __webs_generate_handshake(soc_buffer.data,
+		ws_info.webs_key);
+	
 	send(_self->fd, soc_buffer.data, soc_buffer.len, 0);
 	
 	/* call client on_open function */
@@ -419,16 +671,16 @@ static void __webs_client_main(webs_client* _self) {
 			data = malloc(frm.length + 1);
 			
 			if (data == NULL)
-				XERR("Failed to allocate memory!", ENOMEM);
+				WEBS_XERR("Failed to allocate memory!", ENOMEM);
 			
-			if (webs_asserted_read(_self->fd, data, frm.length) < 0) {
+			if (__webs_asserted_read(_self->fd, data, frm.length) < 0) {
 				error = WEBS_ERR_READ_FAILED;
 				free(data);
 				break;
 			}
 			
 			total = frm.length;
-			webs_decode_data(data, frm.key, frm.length);
+			__webs_decode_data(data, frm.key, frm.length);
 			
 			if (!WEBSFR_GET_FINISH(frm.info)) {
 				cont = 1;
@@ -441,15 +693,16 @@ static void __webs_client_main(webs_client* _self) {
 			data = realloc(data, total + frm.length);
 			
 			if (data == NULL)
-				XERR("Failed to allocate memory!", ENOMEM);
+				WEBS_XERR("Failed to allocate memory!", ENOMEM);
 			
-			if (webs_asserted_read(_self->fd, data + total, frm.length) < 0) {
+			if (__webs_asserted_read(_self->fd, data + total,
+			frm.length) < 0) {
 				error = WEBS_ERR_READ_FAILED;
 				free(data);
 				break;
 			}
 			
-			webs_decode_data(data + total, frm.key, frm.length);
+			__webs_decode_data(data + total, frm.key, frm.length);
 			
 			total += frm.length;
 			
@@ -463,7 +716,8 @@ static void __webs_client_main(webs_client* _self) {
 		 * set error and skip the frame */
 		else {
 			if (*_self->srv->events.on_error)
-				(*_self->srv->events.on_error)(_self, WEBS_ERR_UNEXPECTED_CONTINUTATION);
+				(*_self->srv->events.on_error)(_self,
+					WEBS_ERR_UNEXPECTED_CONTINUTATION);
 			
 			__webs_flush(_self->fd, frm.off + frm.length - 2);
 			continue;
@@ -471,7 +725,9 @@ static void __webs_client_main(webs_client* _self) {
 		
 		/* respond to close */
 		if (WEBSFR_GET_OPCODE(frm.info) == 0x8) {
-			soc_buffer.len = __webs_generate_frame(data, soc_buffer.data, frm.length, 0x8);
+			soc_buffer.len = __webs_make_frame(data, soc_buffer.data,
+				frm.length, 0x8);
+			
 			send(_self->fd, soc_buffer.data, soc_buffer.len, 0);
 			
 			error = 0;
@@ -504,7 +760,7 @@ static void __webs_client_main(webs_client* _self) {
 	ABORT:
 	
 	close(_self->fd);
-	webs_remove_client((struct webs_client_node*) _self);
+	__webs_remove_client((struct webs_client_node*) _self);
 	
 	return;
 }
@@ -524,24 +780,10 @@ static void __webs_main(webs_server* _srv) {
 		
 		if (user.fd >= 0) {
 			user_ptr = __webs_add_client(_srv, user);
-			pthread_create(&user_ptr->thread, 0, (void*(*)(void*)) __webs_client_main, user_ptr);
+			pthread_create(&user_ptr->thread, 0,
+				(void*(*)(void*)) __webs_client_main, user_ptr);
 		}
 	}
-	
-	return;
-}
-
-void webs_remove_client(struct webs_client_node* _node) {
-	if (_node == NULL) return;
-	
-	if (_node->prev)
-		_node->prev->next = _node->next;
-	
-	if (_node->next)
-		_node->next->prev = _node->prev;
-	
-	_node->client.srv->num_clients--;
-	free(_node);
 	
 	return;
 }
@@ -552,7 +794,7 @@ void webs_eject(webs_client* _self) {
 	
 	close(_self->fd);
 	pthread_cancel(_self->thread);
-	webs_remove_client((struct webs_client_node*) _self);
+	__webs_remove_client((struct webs_client_node*) _self);
 	
 	return;
 }
@@ -575,35 +817,6 @@ void webs_close(webs_server* _srv) {
 	return;
 }
 
-ssize_t webs_asserted_read(int _fd, void* _dst, size_t _n) {
-    ssize_t bytes_read;
-	size_t size = 32768;
-    size_t i;
-	
-    for (i = 0; i < _n;) {
-		if (_n - i < size)
-			size = _n - i;
-		
-		bytes_read = read(_fd, (char*) _dst + i, size);
-		
-		if (bytes_read < 0)
-			return -1;
-		
-		i += bytes_read;
-    }
-	
-    return i;
-}
-
-int webs_decode_data(char* _dta, uint32_t _key, ssize_t _n) {
-	ssize_t i;
-	
-	for (i = 0; i < _n; i++)
-		_dta[i] ^= ((char*) &_key)[i % 4];
-	
-	return 0;
-}
-
 int webs_send(webs_client* _self, char* _data) {
 	/* general-purpose recv/send buffer */
 	struct webs_buffer soc_buffer = {0};
@@ -620,7 +833,7 @@ int webs_send(webs_client* _self, char* _data) {
 	return write(
 		_self->fd,
 		soc_buffer.data,
-		__webs_generate_frame(_data, soc_buffer.data, len, 0x1)
+		__webs_make_frame(_data, soc_buffer.data, len, 0x1)
 	);
 	
 	return 0;
@@ -636,7 +849,7 @@ int webs_sendn(webs_client* _self, char* _data, ssize_t _n) {
 	return write(
 		_self->fd,
 		soc_buffer.data,
-		__webs_generate_frame(_data, soc_buffer.data, _n, 0x1)
+		__webs_make_frame(_data, soc_buffer.data, _n, 0x1)
 	);
 }
 
@@ -688,7 +901,8 @@ webs_server* webs_start(int _port) {
 	server_id_counter++;
 	
 	/* fork further processing to seperate thread */
-	pthread_create(&server->thread, 0, (void*(*)(void*)) __webs_main, server);
+	pthread_create(&server->thread, 0,
+		(void*(*)(void*)) __webs_main, server);
 	
 	return server;
 }

@@ -1,4 +1,4 @@
-CFLAGS := -Wall -Wextra -Wpedantic -Wno-unused-parameter -Wno-cast-function-type
+CFLAGS := -Wall -Wextra -Wpedantic -Wno-unused-parameter -Wno-cast-function-type -Wno-overlength-strings
 STD := c89
 CC := gcc
 
@@ -11,7 +11,7 @@ compile:
 	@echo "CC     = ${CC}"
 	@echo
 	
-	$(CC) -c src/*.c examples/test.c $(CFLAGS) -std=$(STD)
+	$(CC) -c *.c examples/test.c $(CFLAGS) -std=$(STD)
 
 build: compile
 	$(CC) -o webs *.o -lpthread
