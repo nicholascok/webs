@@ -6,7 +6,7 @@ C89 compliant websocket server library.
 
 ### Starting a Server
 ```
-#include ".../path/to/webs.c"
+#include ".../path/to/webs.h"
 
 /* code... */
 
@@ -24,15 +24,14 @@ int main(void) {
 		return 1;
 	}
 	
-	/* add event handlers */
-	/* note: if on_ping is not defined, default is to respond to pings */
+	/* add event handlers - not necessary, defaults to NULL */
 	server0->events.on_open = myFuncOpen0;
 	server0->events.on_data = myFuncDate0;
 	server0->events.on_close = myFuncClose0;
 	server0->events.on_error = myFuncError0;
 	server0->events.on_pong = myFuncPong0;
 	
-	server1->events = {myFuncOpen1, myFuncDate1, myFuncClose1, myFuncError1, myFuncPong1, myFuncPing1};
+	server1->events = {myFuncOpen1, myFuncDate1, myFuncClose1, myFuncError1, NULL, NULL};
 	
 	/* wait for servers to return from main */
 	webs_hold(server0);
@@ -44,6 +43,13 @@ int main(void) {
 	
 	return 0;
 }
+```
+### Compilation
+
+```
+$ cc -c webs.c my_server.c
+$ cc -o my_server webs.o my_server.o -lpthread
+$ ./my_server
 ```
 
 ### Events
