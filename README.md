@@ -1,5 +1,5 @@
 # webs
-C89 compliant websocket server library.
+simple compliant websocket server library.
 
 ## Usage
 
