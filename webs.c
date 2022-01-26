@@ -59,12 +59,12 @@ static int __webs_sha1(char* _s, char* _d, uint64_t _n) {
 	 * so it is congruent to 56 modulo 64, all in bytes,
 	 * then add 8 bytes for the 64-bit length field */
 	
-	/* equivelanl, ((56 - (_n + 1)) MOD 64) + (_n + 1) + 8,
+	/* equivelantly, ((56 - (_n + 1)) MOD 64) + (_n + 1) + 8,
 	 * where `a MOD b` is the POSITIVE remainder after a is
 	 * divided by b */
 	uint64_t pad_n = _n + ((55 - _n) & 63) + 9;
 	
-	uint64_t num_chks = pad_n / 64;	/* number of chunks to be rocessed */
+	uint64_t num_chks = pad_n / 64;	/* number of chunks to be processed */
 	uint16_t rem_chks_begin = 0;   	/* the first chunk with extended data */
 	uint16_t offset = pad_n - 128; 	/* start index for extended data */
 	
@@ -112,21 +112,13 @@ static int __webs_sha1(char* _s, char* _d, uint64_t _n) {
 			if (j < 20) {
 				f = ((b & c) | ((~b) & d));
 				k = 0x5A827999;
-			}
-			
-			else
-			if (j < 40) {
+			} else if (j < 40) {
 				f = (b ^ c ^ d);
 				k = 0x6ED9EBA1;
-			}
-			
-			else
-			if (j < 60) {
+			} else if (j < 60) {
 				f = ((b & c) | (b & d) | (c & d));
 				k = 0x8F1BBCDC;
-			}
-			
-			else {
+			} else {
 				f = (b ^ c ^ d);
 				k = 0xCA62C1D6;
 			}
@@ -193,10 +185,7 @@ static int __webs_b64_encode(char* _s, char* _d, size_t _n) {
 		_d[i + 1] = TO_B64((_s[0] & 0x03) << 4);
 		_d[i + 2] = '=';
 		_d[i + 3] = '=';
-	}
-	
-	else
-	if (rem == 2) {
+	} else if (rem == 2) {
 		_d[i + 0] = TO_B64(( _s[0] & 0xFC) >> 2);
 		_d[i + 1] = TO_B64(((_s[0] & 0x03) << 4) | ((_s[1] & 0xF0) >> 4));
 		_d[i + 2] = TO_B64(( _s[1] & 0x0F) << 2);
@@ -216,11 +205,11 @@ static int __webs_b64_encode(char* _s, char* _d, size_t _n) {
  * @param _n: the number of bytes to be read.
  */
 static ssize_t __webs_asserted_read(int _fd, void* _dst, size_t _n) {
-    ssize_t bytes_read;
+	ssize_t bytes_read;
 	size_t size = 32768;
-    size_t i;
-	
-    for (i = 0; i < _n;) {
+	size_t i;
+
+	for (i = 0; i < _n;) {
 		if (_n - i < size)
 			size = _n - i;
 		
@@ -230,9 +219,9 @@ static ssize_t __webs_asserted_read(int _fd, void* _dst, size_t _n) {
 			return -1;
 		
 		i += bytes_read;
-    }
-	
-    return i;
+	}
+
+	return i;
 }
 
 /* 
@@ -303,8 +292,7 @@ static int __webs_parse_frame(webs_client* _self, struct webs_frame* _frm) {
 	}
 	
 	/* a value of 127 says to interpret the next eight bytes */
-	else
-	if (WEBSFR_GET_LENGTH(_frm->info) == 127) {
+	else if (WEBSFR_GET_LENGTH(_frm->info) == 127) {
 		error = __webs_asserted_read(_self->fd, &_frm->length, 8);
 		if (error < 0) return -1; /* read(2) error, maybe broken pipe */
 		
@@ -329,7 +317,8 @@ static int __webs_parse_frame(webs_client* _self, struct webs_frame* _frm) {
 	/* by the specification (RFC-6455), since no extensions are yet
 	 * supported, if we recieve non-zero reserved bits the connection
 	 * should be closed */
-	if (WEBSFR_GET_RESVRD(_frm->info) != 0) return -1;
+	if (WEBSFR_GET_RESVRD(_frm->info) != 0)
+		return -1;
 	
 	return 0;
 }
@@ -345,14 +334,11 @@ static int __webs_parse_frame(webs_client* _self, struct webs_frame* _frm) {
  * @return the total number of resulting bytes copied.
  */
 static int __webs_make_frame(char* _src, char* _dst, ssize_t _n, uint8_t _op) {
+	short data_start = 2;	/* offset to the start of the frame's payload */
+	uint16_t hdr = 0;    	/* the frame's header */
 	
-	/* offset to the start of the frame's payload */
-	short data_start = 2;
-	
-	uint16_t hdr = 0; /* the frame's header */
-	
-	WEBSFR_SET_FINISH(hdr, 0x1); /* this is not a cont. frame */
-	WEBSFR_SET_OPCODE(hdr, _op); /* opcode */
+	WEBSFR_SET_FINISH(hdr, 0x1);	/* this is not a cont. frame */
+	WEBSFR_SET_OPCODE(hdr, _op);	/* opcode */
 	
 	/* set frame length field */
 	
@@ -366,17 +352,14 @@ static int __webs_make_frame(char* _src, char* _dst, ssize_t _n, uint8_t _op) {
 	
 	/* if we have more than 2^16 bytes, store the length in
 	 * the next eight bytes */
-	else
-	if (_n > 65536) {
+	else if (_n > 65536) {
 		WEBSFR_SET_LENGTH(hdr, 127);
 		CASTP(_dst + 2, uint64_t) = WEBS_BIG_ENDIAN_QWORD((uint64_t) _n);
 		data_start = 10;
 	}
 	
 	/* otherwise place the value right in the field */
-	else {
-		WEBSFR_SET_LENGTH(hdr, _n);
-	}
+	else WEBSFR_SET_LENGTH(hdr, _n);
 	
 	/* write header to buffer */
 	CASTP(_dst, uint16_t) = hdr;
@@ -395,8 +378,6 @@ static int __webs_make_frame(char* _src, char* _dst, ssize_t _n, uint8_t _op) {
  * @return -1 on error (bad vers., ill-formed, etc.), or 0
  * otherwise.
  */
-
-/* really ugly, I know... */
 static int __webs_process_handshake(char* _src, struct webs_info* _rtn) {
 	char http_vrs_low = 0;
 	
@@ -451,7 +432,7 @@ static int __webs_process_handshake(char* _src, struct webs_info* _rtn) {
  * client provided key with a magic string, and returning the
  * base-64 encoded, SHA-1 hash of the result in the "Sec-WebSocket-
  * Accept" field of an HTTP response header.
- * @param dst: a buffer that will hold the resulting HTTP
+ * @param _dst: a buffer that will hold the resulting HTTP
  * response data.
  * @param _key: a pointer to the websocket key provided by the
  * client in it's HTTP websocket request header.
@@ -772,9 +753,9 @@ static void* __webs_client_main(void* _self) {
 }
 
 /* 
- * main loop for a server, listens for connectinos and forks
+ * main loop for a server, listens for connections and forks
  * them off for further initialisation.
- * @param _sv: te server that is calling.
+ * @param _srv: the server that is calling.
  */
 static void* __webs_main(void* _srv) {
 	webs_server* srv = (webs_server*) _srv;
@@ -849,7 +830,7 @@ int webs_sendn(webs_client* _self, char* _data, ssize_t _n) {
 	/* general-purpose recv/send buffer */
 	struct webs_buffer soc_buffer = {0};
 	
-	/* check for nullptr or empty string */
+	/* check for NULL or empty string */
 	if (!_data || !*_data) return 0;
 	
 	return write(
@@ -867,7 +848,6 @@ void webs_pong(webs_client* _self) {
 
 int webs_hold(webs_server* _srv) {
 	if (_srv == NULL) return -1;
-	
 	return pthread_join(_srv->thread, 0);
 }
 
