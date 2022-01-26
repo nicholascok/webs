@@ -1,9 +1,10 @@
 #include "webs.h"
 
-/* header for pong frame (in response to ping) */
+/* headers for ping and pong frames */
 uint8_t WEBS_PING[2] = {0x89, 0x00};
 uint8_t WEBS_PONG[2] = {0x8A, 0x00};
 
+/* masks... */
 uint8_t WEBSFR_LENGTH_MASK[2] = {0x00, 0x7F};
 uint8_t WEBSFR_OPCODE_MASK[2] = {0x0F, 0x00};
 uint8_t WEBSFR_MASKED_MASK[2] = {0x00, 0x80};
@@ -23,7 +24,7 @@ static int __webs_strcat(char* _buf, char* _a, char* _b) {
 
 /* 
  * C89 doesn't officially support 64-bt integer constants, so
- * thats why this mess is here...  (there is a better way)
+ * thats why this is here...
  */
 uint64_t __WEBS_BIG_ENDIAN_QWORD(uint64_t _x) {
 	((uint32_t*) &_x)[0] = WEBS_BIG_ENDIAN_DWORD(((uint32_t*) &_x)[0]);
@@ -208,7 +209,7 @@ static ssize_t __webs_asserted_read(int _fd, void* _dst, size_t _n) {
 	ssize_t bytes_read;
 	size_t size = 32768;
 	size_t i;
-
+	
 	for (i = 0; i < _n;) {
 		if (_n - i < size)
 			size = _n - i;
@@ -220,7 +221,7 @@ static ssize_t __webs_asserted_read(int _fd, void* _dst, size_t _n) {
 		
 		i += bytes_read;
 	}
-
+	
 	return i;
 }
 
@@ -842,7 +843,6 @@ int webs_sendn(webs_client* _self, char* _data, ssize_t _n) {
 
 void webs_pong(webs_client* _self) {
 	webs_sendn(_self, (char*) &WEBS_PONG, 2);
-	
 	return;
 }
 
