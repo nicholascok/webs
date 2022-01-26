@@ -46,8 +46,7 @@ int main(void) {
 ### Compilation
 
 ```
-$ cc -c webs.c my_server.c
-$ cc -o my_server webs.o my_server.o -lpthread
+$ cc -o my_server webs.c my_server.c -lpthread
 $ ./my_server
 ```
 
