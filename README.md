@@ -61,7 +61,7 @@ $ ./my_server
 | `on_ping` | called when a client pings the server |
 
 ### Formatting
-when implementing you own functions, each event's function must be structured a certain way, as detailed below, but firstly, I'll include the definitions for `struct webs_client` and `struct webs_server`, in case they are useful.
+when implementing your own functions, each event's function must be structured a certain way, as detailed below, but firstly, I'll include the definitions for `struct webs_client` and `struct webs_server` in case they are useful.
 
 ```
 struct webs_client {
